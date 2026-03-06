@@ -906,12 +906,14 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     const sec = delta / 1000;
 
     // 累计小数，整数部分才实际加到 HP/MP（正确处理 hpr < 1 的情况）
+    let changed = false;
     if (state.hero.hp < maxHp) {
       hpRegenAcc += hpr * mult * sec;
       const whole = Math.floor(hpRegenAcc);
       if (whole > 0) {
         hpRegenAcc -= whole;
         state.hero.hp = Math.min(maxHp, state.hero.hp + whole);
+        changed = true;
       }
     } else {
       hpRegenAcc = 0; // 满血后重置，防止溢出累积
@@ -923,12 +925,14 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
       if (whole > 0) {
         mpRegenAcc -= whole;
         state.hero.mp = Math.min(maxMp, state.hero.mp + whole);
+        changed = true;
       }
     } else {
       mpRegenAcc = 0;
     }
 
-    if (window.UI) UI.markSidePanelDirty();
+    // 只在数值实际变化时才标脏（避免每 tick 都重建侧面板导致 hover 频闪）
+    if (changed && window.UI) UI.markSidePanelDirty();
   }
 
   /**
