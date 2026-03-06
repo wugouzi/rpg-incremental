@@ -10,6 +10,8 @@ const UI = (() => {
   let _logFilter = "all";
   // 侧面板脏标记：true 时下一个 tick 才重建 DOM，避免每帧重建导致 hover 闪烁
   let _sidePanelDirty = false;
+  // 鼠标是否在侧面板内：hover 期间暂停重建，彻底消除按钮闪烁
+  let _sidePanelHovered = false;
   // 技能分组折叠状态 { groupClass: true=折叠 }
   const _skillFold = {};
 
@@ -57,7 +59,15 @@ const UI = (() => {
     });
 
     // 侧面板事件委托（动态按钮）
-    document.getElementById("side-panel").addEventListener("click", onSidePanelClick);
+    const sp = document.getElementById("side-panel");
+    sp.addEventListener("click",      onSidePanelClick);
+    // 鼠标进入/离开侧面板时更新 hover 标志（控制 refreshSidePanelIfDirty）
+    sp.addEventListener("mouseenter", () => { _sidePanelHovered = true;  });
+    sp.addEventListener("mouseleave", () => {
+      _sidePanelHovered = false;
+      // 离开后若有积压的脏标记，立即刷新
+      if (_sidePanelDirty) refreshSidePanel();
+    });
   }
 
   // ─────────────────────────────────────────
@@ -322,12 +332,11 @@ const UI = (() => {
 
   /**
    * 仅在脏时刷新侧面板（供 main.js tick 调用）
-   * 若 tooltip 正在显示，推迟重建（避免 hover 频闪）
+   * 鼠标在侧面板内时暂停重建，离开时再补刷，彻底消除按钮 hover 闪烁
    */
   function refreshSidePanelIfDirty() {
     if (!_sidePanelDirty) return;
-    const tt = document.getElementById("item-tooltip");
-    if (tt && tt.classList.contains("visible")) return; // tooltip 可见时推迟
+    if (_sidePanelHovered) return; // 鼠标在面板内，推迟到 mouseleave 时刷新
     refreshSidePanel();
   }
 

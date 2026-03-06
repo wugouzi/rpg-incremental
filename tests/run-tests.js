@@ -100,6 +100,7 @@ const testFiles = [
   "test-mage-spec.js",
   "test-skill-subgroups.js",
   "test-regen.js",
+  "test-ui-dirty.js",
 ];
 
 console.log(gr("Running tests...\n"));
