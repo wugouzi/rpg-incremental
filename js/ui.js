@@ -13,6 +13,14 @@ const UI = (() => {
   // 技能分组折叠状态 { groupClass: true=折叠 }
   const _skillFold = {};
 
+  // 品质缩写标签 { tag, color }
+  const RARITY_TAG = {
+    common:    { tag: "",        color: ""         },
+    rare:      { tag: "[RARE]",  color: "cyan"     },
+    epic:      { tag: "[EPIC]",  color: "yellow"   },
+    legendary: { tag: "[LGND]",  color: "red"      },
+  };
+
   // ─────────────────────────────────────────
   // 初始化（绑定所有静态事件）
   // ─────────────────────────────────────────
@@ -753,6 +761,72 @@ const UI = (() => {
       { label: "RANGER SKILLS",  class: "ranger"  },
     ];
 
+    // 渲染单条技能行（供大组和子组共用）
+    function _renderSkillRow(skill, indent) {
+      const check = Skills.canUnlock(skill.id);
+      const learned = !!state.unlockedSkills[skill.id];
+      const pad = indent || "  ";
+      const row = document.createElement("div");
+      row.style.marginBottom = "4px";
+
+      if (learned) {
+        row.innerHTML = `<span style="color:${COLOR_MAP.cyan}">${pad}[LEARNED] ${skill.name}</span> <span style="color:${COLOR_MAP.gray}">${skill.description}</span>`;
+      } else {
+        const canLearn = check.ok;
+        const nameColor = canLearn ? COLOR_MAP.white : COLOR_MAP.gray;
+
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = `${pad}${skill.name} (Lv.${skill.unlockLevel}, ${skill.cost.gold}g)`;
+        nameSpan.style.color = nameColor;
+        row.appendChild(nameSpan);
+
+        const descSpan = document.createElement("span");
+        descSpan.textContent = ` - ${skill.description}`;
+        descSpan.style.color = COLOR_MAP.gray;
+        row.appendChild(descSpan);
+
+        row.appendChild(document.createElement("br"));
+
+        const btn = document.createElement("span");
+        if (canLearn) {
+          btn.textContent = `${pad}  [Learn]`;
+          btn.className = "btn";
+          btn.dataset.action = "learnSkill";
+          btn.dataset.skillId = skill.id;
+        } else {
+          btn.textContent = `${pad}  [${check.reason}]`;
+          btn.style.color = COLOR_MAP.gray;
+        }
+        row.appendChild(btn);
+      }
+      return row;
+    }
+
+    // 渲染子折叠组（法师专精子分组使用）
+    function _renderSubGroup(el, key, label, skills) {
+      if (skills.length === 0) return;
+      if (_skillFold[key] === undefined) _skillFold[key] = true;
+      const isFolded = !!_skillFold[key];
+      const learnedCount = skills.filter(s => state.unlockedSkills[s.id]).length;
+      const arrow = isFolded ? "▶" : "▼";
+
+      const subHeader = document.createElement("div");
+      subHeader.style.cursor = "pointer";
+      subHeader.style.userSelect = "none";
+      subHeader.style.color = COLOR_MAP.yellow;
+      subHeader.style.marginTop = "4px";
+      subHeader.style.marginLeft = "4px";
+      subHeader.dataset.action = "toggleFold";
+      subHeader.dataset.foldGroup = key;
+      subHeader.textContent = `    ${arrow} ${label} (${learnedCount}/${skills.length})`;
+      el.appendChild(subHeader);
+
+      if (!isFolded) {
+        skills.forEach(skill => el.appendChild(_renderSkillRow(skill, "      ")));
+        el.appendChild(document.createElement("br"));
+      }
+    }
+
     groups.forEach(g => {
       const skillsInGroup = Skills.getByClass(g.class).filter(s => s.class === g.class);
       if (skillsInGroup.length === 0) return;
@@ -778,46 +852,34 @@ const UI = (() => {
 
       if (isFolded) return; // 折叠时只渲染标题
 
-      skillsInGroup.forEach(skill => {
-        const check = Skills.canUnlock(skill.id);
-        const learned = !!state.unlockedSkills[skill.id];
-        const row = document.createElement("div");
-        row.style.marginBottom = "4px";
+      // ── 法师：内部分为 Base / Spec-Gate / 各专精 子组 ──
+      if (g.class === "mage") {
+        const currentSpec = state.mage && state.mage.spec;
+        const specLabels = { pyro: "🔥 PYROMANCER", cryo: "❄️  CRYOMANCER", storm: "⚡ STORMCALLER" };
 
-        if (learned) {
-          row.innerHTML = `<span style="color:${COLOR_MAP.cyan}">  [LEARNED] ${skill.name}</span> <span style="color:${COLOR_MAP.gray}">${skill.description}</span>`;
-        } else {
-          const canLearn = check.ok;
-          const nameColor = canLearn ? COLOR_MAP.white : COLOR_MAP.gray;
+        // Base Skills（无 spec 字段、无 specGate 字段）
+        const baseSkills = skillsInGroup.filter(s => !s.spec && !s.specGate);
+        _renderSubGroup(el, "mage_base", "BASE SKILLS", baseSkills);
 
-          const nameSpan = document.createElement("span");
-          nameSpan.textContent = `  ${skill.name} (Lv.${skill.unlockLevel}, ${skill.cost.gold}g)`;
-          nameSpan.style.color = nameColor;
-          row.appendChild(nameSpan);
+        // Spec-Gate Skills（specGate=true，选择专精用的门控技能）
+        const specGateSkills = skillsInGroup.filter(s => s.specGate);
+        _renderSubGroup(el, "mage_spec_gate", "── CHOOSE SPEC ──", specGateSkills);
 
-          const descSpan = document.createElement("span");
-          descSpan.textContent = ` - ${skill.description}`;
-          descSpan.style.color = COLOR_MAP.gray;
-          row.appendChild(descSpan);
+        // 专精子组（仅在已选对应专精时显示）
+        ["pyro", "cryo", "storm"].forEach(specId => {
+          const specSkills = skillsInGroup.filter(s => s.spec === specId);
+          if (specSkills.length === 0) return; // 未选该专精时 getByClass 已过滤掉
+          const subKey = `mage_${specId}`;
+          const subLabel = specLabels[specId] || specId.toUpperCase();
+          _renderSubGroup(el, subKey, subLabel, specSkills);
+        });
 
-          const br = document.createElement("br");
-          row.appendChild(br);
+        el.appendChild(document.createElement("br"));
+        return;
+      }
 
-          const btn = document.createElement("span");
-          if (canLearn) {
-            btn.textContent = "    [Learn]";
-            btn.className = "btn";
-            btn.dataset.action = "learnSkill";
-            btn.dataset.skillId = skill.id;
-          } else {
-            btn.textContent = `    [${check.reason}]`;
-            btn.style.color = COLOR_MAP.gray;
-          }
-          row.appendChild(btn);
-        }
-
-        el.appendChild(row);
-      });
+      // 其他职业：扁平列表
+      skillsInGroup.forEach(skill => el.appendChild(_renderSkillRow(skill, "  ")));
       el.appendChild(document.createElement("br"));
     });
   }

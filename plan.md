@@ -202,6 +202,7 @@ incremental/
 - [x] HPR/MPR 属性系统：新增 HP/MP 回复速率属性（基础值 = level×0.1/level×0.05），装备可带 `of Recovery`(hpr)/`of Clarity`(mpr) 词缀；战斗外每秒自动回复；新增 [REST] 按钮（3× 回复速率，5s 后自动结束；战斗中无法使用）；左侧面板显示 HPR/MPR 数值及休息状态 💤；新增 12 个测试，总计 297 通过
 - [x] 日志过滤栏：在战斗日志上方增加 [ALL] / [COMBAT] / [LOOT] 三个过滤 tab；每条日志自动推断分类（攻击/技能伤害→combat，掉落/金币/升级→loot），点击 tab 即时显示/隐藏，不重建 DOM
 - [x] 技能面板默认折叠：进入 SKILLS 标签时所有分组默认收起（▶），用户手动展开（▼）
+- [x] 法师技能子分组折叠（v0.9.2）：MAGE SKILLS 大组展开后内部细分为 4 个子折叠组（BASE SKILLS / CHOOSE SPEC / 🔥PYROMANCER / ❄️CRYOMANCER / ⚡STORMCALLER），每个子组独立可点击折叠，默认收起；子组 foldGroup key 为 `mage_base`/`mage_spec_gate`/`mage_pyro`/`mage_cryo`/`mage_storm`；单技能行渲染抽取为 `_renderSkillRow` 辅助函数；新增 `tests/test-skill-subgroups.js`（24 项测试），总计 321 通过
 
 ---
 

@@ -98,6 +98,7 @@ const testFiles = [
   "test-save-prestige.js",
   "test-affixes.js",
   "test-mage-spec.js",
+  "test-skill-subgroups.js",
 ];
 
 console.log(gr("Running tests...\n"));
