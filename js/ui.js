@@ -322,11 +322,13 @@ const UI = (() => {
 
   /**
    * 仅在脏时刷新侧面板（供 main.js tick 调用）
+   * 若 tooltip 正在显示，推迟重建（避免 hover 频闪）
    */
   function refreshSidePanelIfDirty() {
-    if (_sidePanelDirty) {
-      refreshSidePanel();
-    }
+    if (!_sidePanelDirty) return;
+    const tt = document.getElementById("item-tooltip");
+    if (tt && tt.classList.contains("visible")) return; // tooltip 可见时推迟
+    refreshSidePanel();
   }
 
   // ─────────────────────────────────────────
@@ -464,8 +466,8 @@ const UI = (() => {
         btn.dataset.slot = slot;
         row.appendChild(btn);
 
-        // Hover 显示完整属性
-        _bindTooltip(row, item, null);
+        // 只在名称标签上绑定 tooltip（不含按钮区域）
+        _bindTooltip(label, item, null);
       } else {
         const label = document.createElement("span");
         label.textContent = `  ${slotLabels[slot].padEnd(8)}: -- empty --`;
@@ -526,9 +528,9 @@ const UI = (() => {
         btnSell.dataset.iid = item.instanceId;
         row.appendChild(btnSell);
 
-        // Hover tooltip：显示属性 + 与已装备对比
+        // 只在名称标签上绑定 tooltip（不含按钮区域，避免卖掉后 tooltip 残留）
         const equipped = state.equipment[item.slot] || null;
-        _bindTooltip(row, item, equipped);
+        _bindTooltip(label, item, equipped);
 
         el.appendChild(row);
       });
@@ -703,6 +705,176 @@ const UI = (() => {
   /** 为 DOM 元素绑定 tooltip 事件 */
   function _bindTooltip(el, item, compared) {
     el.addEventListener("mouseenter", e => _showTooltip(e, item, compared));
+    el.addEventListener("mousemove",  e => _posTooltip(e));
+    el.addEventListener("mouseleave", _hideTooltip);
+  }
+
+  // ─────────────────────────────────────────
+  // 技能 Tooltip
+  // ─────────────────────────────────────────
+
+  /** 将 effect 对象转成可读文本行列表 */
+  function _skillEffectLines(effect) {
+    if (!effect) return [];
+    const lines = [];
+    const fmt = {
+      atkMult:          v => `ATK ×${v.toFixed(2)}`,
+      defMult:          v => `DEF ×${v.toFixed(2)}`,
+      hpMult:           v => `Max HP ×${v.toFixed(2)}`,
+      mpMult:           v => `Max MP ×${v.toFixed(2)}`,
+      spdAdd:           v => `SPD +${v.toFixed(2)}`,
+      critAdd:          v => `CRIT +${(v*100).toFixed(1)}%`,
+      regenOnKill:      v => `HP regen ${(v*100).toFixed(0)}% on kill`,
+      deathPenaltyMult: v => `Death gold penalty ×${v.toFixed(2)}`,
+      dmgMult:          v => `Damage ×${v.toFixed(2)}`,
+      cd:               v => `Cooldown: ${(v/1000).toFixed(1)}s`,
+      mpCost:           v => v > 0 ? `MP Cost: ${v}` : null,
+      hprAdd:           v => `HPR +${v.toFixed(1)}/s`,
+      mprAdd:           v => `MPR +${v.toFixed(1)}/s`,
+      dodgeChance:      v => `Dodge +${(v*100).toFixed(0)}%`,
+      poisonChance:     v => `Poison chance +${(v*100).toFixed(0)}%`,
+      critDmgMult:      v => `Crit DMG ×${v.toFixed(2)}`,
+      goldBonus:        v => `Gold +${v}%`,
+      expBonus:         v => `EXP +${v}%`,
+      dropBonus:        v => `Drop rate +${v}%`,
+      fireRes:          v => `Fire Res +${v}%`,
+      iceRes:           v => `Ice Res +${v}%`,
+      lightningRes:     v => `Lightning Res +${v}%`,
+      poisonRes:        v => `Poison Res +${v}%`,
+      physRes:          v => `Physical Res +${v}%`,
+      chargeCapBonus:   v => `Charge cap +${v}`,
+      burnCapBonus:     v => `Burn stack cap +${v}`,
+      permafrost:       v => v ? "Freeze lasts longer (Permafrost)" : null,
+      leyLine:          v => v ? "Every 5th hit triggers Ley Line burst" : null,
+      spellEcho:        v => v ? "After using skill, 30% chance to echo" : null,
+      blinkOnFrozen:    v => v ? "Blink to safety when Frozen" : null,
+    };
+    Object.keys(effect).forEach(k => {
+      if (effect[k] === undefined || effect[k] === null) return;
+      if (fmt[k]) {
+        const str = fmt[k](effect[k]);
+        if (str) lines.push(str);
+      } else {
+        // 未知字段：直接显示 key=value
+        lines.push(`${k}: ${effect[k]}`);
+      }
+    });
+    return lines;
+  }
+
+  /** 构建技能 tooltip HTML */
+  function _buildSkillTooltipHTML(skill, learned) {
+    const typeLabel = skill.type === "active" ? "[ ACTIVE ]" : "[ PASSIVE ]";
+    const typeColor = skill.type === "active" ? COLOR_MAP.yellow : COLOR_MAP.cyan;
+
+    let html = "";
+    html += `<div class="tt-name">${skill.name}</div>`;
+    html += `<div style="color:${typeColor};font-size:0.85em">${typeLabel}</div>`;
+    html += `<div class="tt-divider">────────────────────</div>`;
+
+    html += `<div class="tt-stat">  Unlock Lv : ${skill.unlockLevel}</div>`;
+    html += `<div class="tt-stat">  Cost      : ${skill.cost.gold}g</div>`;
+
+    if (skill.requires) {
+      const req = Skills.getTemplate ? Skills.getTemplate(skill.requires) : null;
+      const reqName = req ? req.name : skill.requires;
+      html += `<div class="tt-stat">  Requires  : ${reqName}</div>`;
+    }
+
+    html += `<div class="tt-divider">────────────────────</div>`;
+    html += `<div class="tt-stat" style="white-space:normal;max-width:220px">  ${skill.description}</div>`;
+
+    const effectLines = _skillEffectLines(skill.effect);
+    if (effectLines.length > 0) {
+      html += `<div class="tt-divider">── Effects ─────────</div>`;
+      effectLines.forEach(line => {
+        html += `<div class="tt-affix">  ✦ ${line}</div>`;
+      });
+    }
+
+    if (learned) {
+      html += `<div class="tt-divider">────────────────────</div>`;
+      html += `<div style="color:${COLOR_MAP.cyan}">  ✓ LEARNED</div>`;
+    }
+
+    return html;
+  }
+
+  /** 为技能行绑定 tooltip */
+  function _bindSkillTooltip(el, skill, learned) {
+    el.addEventListener("mouseenter", e => {
+      const tt = document.getElementById("item-tooltip");
+      if (!tt) return;
+      tt.innerHTML = _buildSkillTooltipHTML(skill, learned);
+      tt.classList.add("visible");
+      _posTooltip(e);
+    });
+    el.addEventListener("mousemove",  e => _posTooltip(e));
+    el.addEventListener("mouseleave", _hideTooltip);
+  }
+
+  // ─────────────────────────────────────────
+  // Zone Tooltip
+  // ─────────────────────────────────────────
+
+  const ELEM_COLOR = {
+    fire: "#f38ba8", ice: "#89dceb", lightning: "#f9e2af",
+    poison: "#a6e3a1", phys: "#cad3f5",
+  };
+
+  /** 构建 Zone tooltip HTML */
+  function _buildZoneTooltipHTML(zone) {
+    const unlocked = Zones.isUnlocked(zone.id);
+    const bossSlain = Zones.isBossDefeated(zone.id);
+
+    let html = "";
+    html += `<div class="tt-name">${zone.name}</div>`;
+    html += `<div class="tt-divider">────────────────────</div>`;
+    html += `<div class="tt-stat" style="white-space:normal;max-width:220px">  ${zone.description}</div>`;
+
+    if (!unlocked) {
+      html += `<div class="tt-divider">────────────────────</div>`;
+      const reqZone = zone.unlockCondition ? Zones.getZone(zone.unlockCondition) : null;
+      html += `<div style="color:${COLOR_MAP.red}">  🔒 Defeat ${reqZone ? reqZone.bossName : "???"} to unlock</div>`;
+      return html;
+    }
+
+    // 普通怪物信息
+    const mobs = (window.Monsters ? Monsters.TEMPLATES : []).filter(m => m.zone === zone.id && !m.isBoss);
+    if (mobs.length > 0) {
+      html += `<div class="tt-divider">── Monsters ────────</div>`;
+      mobs.forEach(m => {
+        const elemColor = ELEM_COLOR[m.element] || COLOR_MAP.white;
+        html += `<div class="tt-stat">  <span style="color:${elemColor}">▸ ${m.name}</span>`;
+        html += ` <span style="color:${COLOR_MAP.gray}">[${m.element || "phys"}]</span></div>`;
+        html += `<div style="color:${COLOR_MAP.gray};padding-left:12px">HP:${m.baseHp} ATK:${m.baseAtk} DEF:${m.baseDef} EXP:${m.expReward}</div>`;
+      });
+    }
+
+    // Boss 信息
+    const boss = (window.Monsters ? Monsters.TEMPLATES : []).find(m => m.zone === zone.id && m.isBoss);
+    if (boss) {
+      html += `<div class="tt-divider">── Boss ────────────</div>`;
+      const bossElemColor = ELEM_COLOR[boss.element] || COLOR_MAP.white;
+      const bossStatus = bossSlain
+        ? `<span style="color:${COLOR_MAP.yellow}"> ✓ SLAIN</span>`
+        : `<span style="color:${COLOR_MAP.red}"> ⚠ ACTIVE</span>`;
+      html += `<div class="tt-stat">  <span style="color:${bossElemColor}">☠ ${boss.name}</span>${bossStatus}</div>`;
+      html += `<div style="color:${COLOR_MAP.gray};padding-left:12px">HP:${boss.baseHp} ATK:${boss.baseAtk} EXP:${boss.expReward}</div>`;
+    }
+
+    return html;
+  }
+
+  /** 为 Zone 行绑定 tooltip */
+  function _bindZoneTooltip(el, zone) {
+    el.addEventListener("mouseenter", e => {
+      const tt = document.getElementById("item-tooltip");
+      if (!tt) return;
+      tt.innerHTML = _buildZoneTooltipHTML(zone);
+      tt.classList.add("visible");
+      _posTooltip(e);
+    });
     el.addEventListener("mousemove",  e => _posTooltip(e));
     el.addEventListener("mouseleave", _hideTooltip);
   }
@@ -893,7 +1065,16 @@ const UI = (() => {
       row.style.marginBottom = "4px";
 
       if (learned) {
-        row.innerHTML = `<span style="color:${COLOR_MAP.cyan}">${pad}[LEARNED] ${skill.name}</span> <span style="color:${COLOR_MAP.gray}">${skill.description}</span>`;
+        const learnedSpan = document.createElement("span");
+        learnedSpan.style.color = COLOR_MAP.cyan;
+        learnedSpan.textContent = `${pad}[LEARNED] ${skill.name}`;
+        // tooltip 绑定在已学习的技能名上
+        _bindSkillTooltip(learnedSpan, skill, true);
+        row.appendChild(learnedSpan);
+        const descSpan2 = document.createElement("span");
+        descSpan2.style.color = COLOR_MAP.gray;
+        descSpan2.textContent = ` ${skill.description}`;
+        row.appendChild(descSpan2);
       } else {
         const canLearn = check.ok;
         const nameColor = canLearn ? COLOR_MAP.white : COLOR_MAP.gray;
@@ -901,6 +1082,8 @@ const UI = (() => {
         const nameSpan = document.createElement("span");
         nameSpan.textContent = `${pad}${skill.name} (Lv.${skill.unlockLevel}, ${skill.cost.gold}g)`;
         nameSpan.style.color = nameColor;
+        // tooltip 绑定在技能名 span 上（不含 Learn 按钮）
+        _bindSkillTooltip(nameSpan, skill, false);
         row.appendChild(nameSpan);
 
         const descSpan = document.createElement("span");
@@ -1042,7 +1225,16 @@ const UI = (() => {
       const statusColor = !unlocked ? COLOR_MAP.gray : bossSlain ? COLOR_MAP.yellow : isCurrent ? COLOR_MAP.green : COLOR_MAP.cyan;
 
       const nameLine = document.createElement("div");
-      nameLine.innerHTML = `<span style="color:${nameColor}">${zone.name}</span>  <span style="color:${statusColor}">${status}</span>`;
+      const nameSpanZone = document.createElement("span");
+      nameSpanZone.style.color = nameColor;
+      nameSpanZone.textContent = zone.name;
+      // tooltip 绑在区域名称上
+      _bindZoneTooltip(nameSpanZone, zone);
+      const statusSpan = document.createElement("span");
+      statusSpan.style.color = statusColor;
+      statusSpan.textContent = `  ${status}`;
+      nameLine.appendChild(nameSpanZone);
+      nameLine.appendChild(statusSpan);
       row.appendChild(nameLine);
 
       const descLine = document.createElement("div");

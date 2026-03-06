@@ -915,6 +915,10 @@ const Skills = (() => {
     if (window.UI) UI.markSidePanelDirty();
   }
 
+  function getTemplate(id) {
+    return TEMPLATE_MAP[id] || null;
+  }
+
   return {
     SKILL_TEMPLATES,
     TEMPLATE_MAP,
@@ -924,6 +928,7 @@ const Skills = (() => {
     getActiveSkills,
     getByClass,
     chooseClass,
+    getTemplate,
   };
 })();
 
