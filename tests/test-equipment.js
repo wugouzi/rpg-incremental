@@ -428,4 +428,141 @@ describe("Equipment AFFIX_POOL — hpr/mpr 词缀", () => {
     assert.equal(total.hpr, 4, "hpr 词缀应被合并到 total stats");
     assert.equal(total.def, 5, "原有 def 不应变");
   });
+
+  it("getItemTotalStats 正确合并 physRes 词缀", () => {
+    const item = {
+      stats: { def: 10 },
+      affixes: [{ stat: "physRes", value: 8 }],
+    };
+    const total = Equipment.getItemTotalStats(item);
+    assert.equal(total.physRes, 8, "physRes 词缀应被合并到 total stats");
+  });
+
+  it("getItemTotalStats 多词缀叠加同一 stat", () => {
+    const item = {
+      stats: { atk: 20 },
+      affixes: [
+        { stat: "fireRes", value: 5 },
+        { stat: "fireRes", value: 3 },
+      ],
+    };
+    const total = Equipment.getItemTotalStats(item);
+    assert.equal(total.fireRes, 8, "同一 stat 的多个词缀应叠加");
+  });
+});
+
+describe("Equipment.getItemTotalStats — diff 计算场景", () => {
+  // 模拟 tooltip diff 逻辑：mine - theirs
+  function calcDiff(newItem, equippedItem) {
+    const myTotal  = Equipment.getItemTotalStats(newItem);
+    const cmpTotal = Equipment.getItemTotalStats(equippedItem);
+    const allKeys  = new Set([...Object.keys(myTotal), ...Object.keys(cmpTotal)]);
+    const result = {};
+    allKeys.forEach(k => {
+      const mine   = myTotal[k]  || 0;
+      const theirs = cmpTotal[k] || 0;
+      const diff   = mine - theirs;
+      if (Math.abs(diff) >= 0.001) result[k] = diff;
+    });
+    return result;
+  }
+
+  it("背包物品比装备更好时 diff 为正", () => {
+    const newItem      = { stats: { atk: 30 }, affixes: [] };
+    const equippedItem = { stats: { atk: 20 }, affixes: [] };
+    const diff = calcDiff(newItem, equippedItem);
+    assert.equal(diff.atk, 10, "ATK diff 应为 +10");
+  });
+
+  it("已装备物品比背包更好时 diff 为负", () => {
+    const newItem      = { stats: { atk: 10 }, affixes: [] };
+    const equippedItem = { stats: { atk: 25 }, affixes: [] };
+    const diff = calcDiff(newItem, equippedItem);
+    assert.equal(diff.atk, -15, "ATK diff 应为 -15");
+  });
+
+  it("已装备物品有 physRes 词缀而背包物品没有时，diff 为负", () => {
+    const newItem      = { stats: { atk: 20 }, affixes: [] };
+    const equippedItem = { stats: { atk: 15 }, affixes: [{ stat: "physRes", value: 10 }] };
+    const diff = calcDiff(newItem, equippedItem);
+    assert.equal(diff.physRes, -10, "physRes diff 应为 -10（已装备物品独有属性）");
+    assert.equal(diff.atk, 5, "ATK diff 应为 +5");
+  });
+
+  it("背包物品有 fireRes 词缀而已装备没有时，diff 为正", () => {
+    const newItem      = { stats: { def: 5 }, affixes: [{ stat: "fireRes", value: 12 }] };
+    const equippedItem = { stats: { def: 8 }, affixes: [] };
+    const diff = calcDiff(newItem, equippedItem);
+    assert.equal(diff.fireRes, 12, "fireRes diff 应为 +12");
+    assert.equal(diff.def, -3, "DEF diff 应为 -3");
+  });
+
+  it("两件物品属性完全相同时 diff 为空", () => {
+    const newItem      = { stats: { atk: 20, def: 5 }, affixes: [] };
+    const equippedItem = { stats: { atk: 20, def: 5 }, affixes: [] };
+    const diff = calcDiff(newItem, equippedItem);
+    assert.equal(Object.keys(diff).length, 0, "相同属性时 diff 应为空对象");
+  });
+
+  it("词缀叠加后参与 diff 计算", () => {
+    // 背包：atk 10 + 词缀 +5atk = 总计 15
+    // 装备：atk 20
+    const newItem      = { stats: { atk: 10 }, affixes: [{ stat: "atk", value: 5 }] };
+    const equippedItem = { stats: { atk: 20 }, affixes: [] };
+    const diff = calcDiff(newItem, equippedItem);
+    assert.equal(diff.atk, -5, "词缀叠加后 ATK diff 应为 -5");
+  });
+});
+
+describe("Tooltip diff 格式化规则 — 百分比属性", () => {
+  // 镜像 ui.js 里的格式化逻辑，确保百分比属性带 % 单位
+  const PCT_STATS = new Set(["fireRes","iceRes","lightningRes","poisonRes","physRes","dropBonus","goldBonus","expBonus"]);
+  function fmtDiff(k, diff) {
+    const sign = diff > 0 ? "+" : "";
+    if (k === "crit")          return `${sign}${(diff * 100).toFixed(1)}%`;
+    if (k === "spd")           return `${sign}${diff.toFixed(2)}`;
+    if (k === "hpr" || k === "mpr") return `${sign}${diff.toFixed(1)}/s`;
+    if (PCT_STATS.has(k))      return `${sign}${Math.round(diff)}%`;
+    return `${sign}${Math.round(diff)}`;
+  }
+
+  it("physRes 正值 diff 带 %", () => {
+    assert.equal(fmtDiff("physRes", 8), "+8%");
+  });
+
+  it("physRes 负值 diff 带 %", () => {
+    assert.equal(fmtDiff("physRes", -5), "-5%");
+  });
+
+  it("fireRes 正值 diff 带 %", () => {
+    assert.equal(fmtDiff("fireRes", 12), "+12%");
+  });
+
+  it("iceRes 负值 diff 带 %", () => {
+    assert.equal(fmtDiff("iceRes", -7), "-7%");
+  });
+
+  it("dropBonus 正值 diff 带 %", () => {
+    assert.equal(fmtDiff("dropBonus", 3), "+3%");
+  });
+
+  it("atk（非百分比）正值不带 %", () => {
+    assert.equal(fmtDiff("atk", 10), "+10");
+  });
+
+  it("def（非百分比）负值不带 %", () => {
+    assert.equal(fmtDiff("def", -5), "-5");
+  });
+
+  it("crit diff 转为百分点显示", () => {
+    assert.equal(fmtDiff("crit", 0.05), "+5.0%");
+  });
+
+  it("hpr diff 带 /s 单位", () => {
+    assert.equal(fmtDiff("hpr", 1.5), "+1.5/s");
+  });
+
+  it("hpr 负值 diff 带 /s 单位", () => {
+    assert.equal(fmtDiff("hpr", -2.0), "-2.0/s");
+  });
 });
