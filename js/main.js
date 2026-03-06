@@ -10,10 +10,13 @@ const Game = (() => {
     // 1. 读档（或初始化默认状态）
     Save.load();
 
-    // 2. 绑定 DOM 事件
+    // 2. 初始化黑市（首批商品）
+    if (window.BlackMarket) BlackMarket.init();
+
+    // 3. 绑定 DOM 事件
     UI.init();
 
-    // 3. 首次渲染
+    // 4. 首次渲染
     UI.refresh();
     UI.switchTab("stats");
 
@@ -55,6 +58,9 @@ const Game = (() => {
     if (state.hero.hp > 0) {
       Combat.tick(delta);
     }
+
+    // 黑市 tick（倒计时刷新 & buff 衰减）
+    if (window.BlackMarket) BlackMarket.tick(delta);
 
     // HP/MP 不超过上限（防止 regen 等导致溢出）
     const maxHp = State.getTotalMaxHp();

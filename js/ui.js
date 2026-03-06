@@ -206,6 +206,20 @@ const UI = (() => {
       lines.push(`  ATK BONUS: x${h.prestigeBonus.toFixed(2)}`);
     }
 
+    // 黑市 buff 状态显示
+    const buffs = state.buffs || {};
+    const activeBuffs = [];
+    if ((buffs.atkPctTimer || 0) > 0)  activeBuffs.push(`⚔+${buffs.atkPct}%ATK(${Math.ceil(buffs.atkPctTimer/1000)}s)`);
+    if ((buffs.defPctTimer || 0) > 0)  activeBuffs.push(`🛡+${buffs.defPct}%DEF(${Math.ceil(buffs.defPctTimer/1000)}s)`);
+    if ((buffs.spdAddTimer || 0) > 0)  activeBuffs.push(`💨+${buffs.spdAdd}SPD(${Math.ceil(buffs.spdAddTimer/1000)}s)`);
+    if ((buffs.luckTimer   || 0) > 0)  activeBuffs.push(`🍀+${buffs.goldPct}%G+${buffs.dropPct}%D(${Math.ceil(buffs.luckTimer/1000)}s)`);
+    if ((buffs.regenTimer  || 0) > 0)  activeBuffs.push(`💊+${buffs.hprAdd}HPR(${Math.ceil(buffs.regenTimer/1000)}s)`);
+    if ((buffs.expPctTimer || 0) > 0)  activeBuffs.push(`✨+${buffs.expPct}%EXP(${Math.ceil(buffs.expPctTimer/1000)}s)`);
+    if (activeBuffs.length > 0) {
+      lines.push(`  `);
+      lines.push(`  BUFFS : ${activeBuffs.join(" ")}`);
+    }
+
     document.getElementById("hero-panel").textContent = lines.join("\n");
   }
 
@@ -535,6 +549,65 @@ const UI = (() => {
     });
 
     el.appendChild(pre);
+
+    // ── 属性训练区（带按钮，用 DOM 节点单独渲染）──
+    _renderTrainingSection(el, state);
+  }
+
+  /**
+   * 在 Stats 面板底部渲染训练区
+   */
+  function _renderTrainingSection(el, state) {
+    const trainDefs = [
+      { stat: "atk", label: "ATK",    desc: "+1 Base ATK"    },
+      { stat: "def", label: "DEF",    desc: "+1 Base DEF"    },
+      { stat: "hp",  label: "MaxHP",  desc: "+5 Base MaxHP"  },
+      { stat: "spd", label: "SPD",    desc: "+0.05 Base SPD" },
+    ];
+
+    const header = document.createElement("div");
+    header.textContent = "\n  ── TRAINING ROOM ─────────────────────";
+    header.style.color = COLOR_MAP.white;
+    el.appendChild(header);
+
+    const desc = document.createElement("div");
+    desc.textContent = "  Permanently upgrade your base stats (cost rises each level)";
+    desc.style.color = COLOR_MAP.gray;
+    el.appendChild(desc);
+
+    trainDefs.forEach(def => {
+      const cost = window.State ? State.getTrainCost(def.stat) : 300;
+      const n    = (state.training && state.training[def.stat]) || 0;
+      const canAfford = state.hero.gold >= cost;
+
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "baseline";
+      row.style.gap = "6px";
+      row.style.marginTop = "3px";
+
+      const infoSpan = document.createElement("span");
+      infoSpan.textContent = `  ${def.label.padEnd(6)} Lv.${n}  ${def.desc}`;
+      infoSpan.style.color = COLOR_MAP.white;
+      infoSpan.style.flex = "1";
+      row.appendChild(infoSpan);
+
+      const costSpan = document.createElement("span");
+      costSpan.textContent = `${Utils.formatNum(cost)}g`;
+      costSpan.style.color = canAfford ? COLOR_MAP.yellow : COLOR_MAP.gray;
+      row.appendChild(costSpan);
+
+      const btn = document.createElement("span");
+      btn.textContent = "[Train]";
+      btn.className = canAfford ? "btn" : "btn btn-disabled";
+      if (canAfford) {
+        btn.dataset.action = "train";
+        btn.dataset.stat = def.stat;
+      }
+      row.appendChild(btn);
+
+      el.appendChild(row);
+    });
   }
 
   // ─────────────────────────────────────────
@@ -576,6 +649,18 @@ const UI = (() => {
         btn.dataset.action = "unequip";
         btn.dataset.slot = slot;
         row.appendChild(btn);
+
+        // 洗练按钮（装备槽）
+        const eqReforgeCost = window.Equipment ? Equipment.REFORGE_COST[item.rarity] || 500 : 500;
+        const btnEqReforge = document.createElement("span");
+        btnEqReforge.textContent = `[Reforge ${Utils.formatNum(eqReforgeCost)}g]`;
+        const canEqReforge = state.hero.gold >= eqReforgeCost;
+        btnEqReforge.className = canEqReforge ? "btn btn-reforge" : "btn btn-disabled";
+        if (canEqReforge) {
+          btnEqReforge.dataset.action = "reforge";
+          btnEqReforge.dataset.iid = item.instanceId;
+        }
+        row.appendChild(btnEqReforge);
 
         // 只在名称标签上绑定 tooltip（不含按钮区域）
         _bindTooltip(label, item, null);
@@ -631,6 +716,17 @@ const UI = (() => {
         btnEnh.dataset.action = "enhance";
         btnEnh.dataset.iid = item.instanceId;
         row.appendChild(btnEnh);
+
+          const reforgeCost = window.Equipment ? Equipment.REFORGE_COST[item.rarity] || 500 : 500;
+        const btnReforge = document.createElement("span");
+        btnReforge.textContent = `[Reforge ${Utils.formatNum(reforgeCost)}g]`;
+        const canReforge = state.hero.gold >= reforgeCost;
+        btnReforge.className = canReforge ? "btn btn-reforge" : "btn btn-disabled";
+        if (canReforge) {
+          btnReforge.dataset.action = "reforge";
+          btnReforge.dataset.iid = item.instanceId;
+        }
+        row.appendChild(btnReforge);
 
         const btnSell = document.createElement("span");
         btnSell.textContent = `[Sell ${item.sellPrice}g]`;
@@ -1066,6 +1162,91 @@ const UI = (() => {
         el.appendChild(row);
       });
     });
+
+    // 黑市区域
+    _renderBlackMarket(el, state);
+  }
+
+  // ─────────────────────────────────────────
+  // 黑市 UI（嵌入在 Shop 面板底部）
+  // ─────────────────────────────────────────
+
+  function _renderBlackMarket(el, state) {
+    if (!window.BlackMarket) return;
+
+    const countdown = BlackMarket.getRefreshCountdown();
+    const min = Math.floor(countdown / 60);
+    const sec = countdown % 60;
+    const countdownStr = `${min}:${String(sec).padStart(2, "0")}`;
+
+    const header = document.createElement("div");
+    header.style.color = COLOR_MAP.yellow;
+    header.style.marginTop = "12px";
+    header.textContent = `  ── 🕵 BLACK MARKET (refreshes in ${countdownStr}) ──`;
+    el.appendChild(header);
+
+    const stock = BlackMarket.getStock();
+    if (stock.length === 0) {
+      const empty = document.createElement("div");
+      empty.textContent = "  (No stock available)";
+      empty.style.color = COLOR_MAP.gray;
+      el.appendChild(empty);
+      return;
+    }
+
+    stock.forEach((entry, idx) => {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "baseline";
+      row.style.gap = "4px";
+      row.style.marginTop = "4px";
+
+      if (entry.type === "sold") {
+        const soldSpan = document.createElement("span");
+        soldSpan.textContent = `  ${entry.name}`;
+        soldSpan.style.color = COLOR_MAP.gray;
+        row.appendChild(soldSpan);
+        el.appendChild(row);
+        return;
+      }
+
+      const typeIcon = entry.type === "scroll" ? "📜" : "🎁";
+      const nameSpan = document.createElement("span");
+      nameSpan.textContent = `  ${typeIcon} ${entry.name}`;
+      nameSpan.style.color = entry.type === "scroll" ? COLOR_MAP.cyan : COLOR_MAP.yellow;
+      nameSpan.style.flex = "1";
+      row.appendChild(nameSpan);
+
+      const descSpan = document.createElement("span");
+      descSpan.textContent = entry.desc;
+      descSpan.style.color = COLOR_MAP.gray;
+      descSpan.style.fontSize = "0.85em";
+      row.appendChild(descSpan);
+
+      el.appendChild(row);
+
+      // 价格行 + 购买按钮
+      const btnRow = document.createElement("div");
+      btnRow.style.display = "flex";
+      btnRow.style.gap = "6px";
+      btnRow.style.marginLeft = "4px";
+
+      const canAfford = state.hero.gold >= entry.cost;
+      const priceSpan = document.createElement("span");
+      priceSpan.textContent = `     ${Utils.formatNum(entry.cost)}g`;
+      priceSpan.style.color = canAfford ? COLOR_MAP.yellow : COLOR_MAP.gray;
+      btnRow.appendChild(priceSpan);
+
+      const btn = document.createElement("span");
+      btn.textContent = "[Buy]";
+      btn.className = canAfford ? "btn" : "btn btn-disabled";
+      if (canAfford) {
+        btn.dataset.action = "buyBlackMarket";
+        btn.dataset.bmIdx  = idx;
+      }
+      btnRow.appendChild(btn);
+      el.appendChild(btnRow);
+    });
   }
 
   // ─────────────────────────────────────────
@@ -1434,6 +1615,15 @@ const UI = (() => {
         if (item) Equipment.sell(item);
         break;
       }
+      case "reforge": {
+        // 背包或装备槽均可洗练
+        const iid = target.dataset.iid;
+        const invItem = state.inventory.find(i => String(i.instanceId) === iid);
+        const eqItem  = Object.values(state.equipment).find(i => i && String(i.instanceId) === iid);
+        const rfItem  = invItem || eqItem;
+        if (rfItem) Equipment.reforge(rfItem);
+        break;
+      }
       case "buy": {
         Equipment.buy(target.dataset.itemId);
         break;
@@ -1457,6 +1647,14 @@ const UI = (() => {
       case "toggleFold": {
         const group = target.dataset.foldGroup;
         _skillFold[group] = !_skillFold[group];
+        break;
+      }
+      case "train": {
+        State.train(target.dataset.stat);
+        break;
+      }
+      case "buyBlackMarket": {
+        BlackMarket.buy(parseInt(target.dataset.bmIdx, 10));
         break;
       }
     }

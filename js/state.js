@@ -103,6 +103,14 @@ const State = (() => {
         bossesDefeated: 0,
       },
 
+      // 属性训练次数（金币消耗系统）
+      training: {
+        atk: 0,   // 已训练次数
+        def: 0,
+        hp:  0,
+        spd: 0,
+      },
+
       // 区域 boss 击败记录 { zoneId: true }
       bossDefeated: {},
 
@@ -208,18 +216,36 @@ const State = (() => {
     return { atkMult: 1, defMult: 1, hpMult: 1, spdAdd: 0, critAdd: 0, hprAdd: 0, mprAdd: 0 };
   }
 
+  /** 获取临时 buff 加成（来自黑市卷轴） */
+  function getBuffBonus() {
+    const b = data.buffs || {};
+    return {
+      atkPct:  b.atkPct  || 0,   // ATK 百分比加成（如 30 = +30%）
+      defPct:  b.defPct  || 0,
+      spdAdd:  b.spdAdd  || 0,
+      goldPct: b.goldPct || 0,
+      dropPct: b.dropPct || 0,
+      hprAdd:  b.hprAdd  || 0,
+      mprAdd:  b.mprAdd  || 0,
+      expPct:  b.expPct  || 0,
+    };
+  }
+
   function getTotalAtk() {
     const eq = getEquipBonus();
     const sk = getSkillEffects();
+    const buf = getBuffBonus();
     return Math.floor(
       (data.hero.baseAtk + eq.atk) * sk.atkMult * data.hero.prestigeBonus
+      * (1 + buf.atkPct / 100)
     );
   }
 
   function getTotalDef() {
     const eq = getEquipBonus();
     const sk = getSkillEffects();
-    return Math.floor((data.hero.baseDef + eq.def) * (sk.defMult || 1));
+    const buf = getBuffBonus();
+    return Math.floor((data.hero.baseDef + eq.def) * (sk.defMult || 1) * (1 + buf.defPct / 100));
   }
 
   function getTotalMaxHp() {
@@ -237,7 +263,8 @@ const State = (() => {
   function getTotalSpd() {
     const eq = getEquipBonus();
     const sk = getSkillEffects();
-    return data.hero.baseSpd + eq.spd + (sk.spdAdd || 0);
+    const buf = getBuffBonus();
+    return data.hero.baseSpd + eq.spd + (sk.spdAdd || 0) + buf.spdAdd;
   }
 
   function getTotalCrit() {
@@ -259,8 +286,9 @@ const State = (() => {
   function getTotalHpr() {
     const eq  = getEquipBonus();
     const sk  = getSkillEffects();
+    const buf = getBuffBonus();
     const base = 1 + data.hero.level * 0.3;
-    return Math.max(0, base + eq.hpr + (sk.hprAdd || 0));
+    return Math.max(0, base + eq.hpr + (sk.hprAdd || 0) + buf.hprAdd);
   }
 
   /**
@@ -270,8 +298,9 @@ const State = (() => {
   function getTotalMpr() {
     const eq  = getEquipBonus();
     const sk  = getSkillEffects();
+    const buf = getBuffBonus();
     const base = 0.5 + data.hero.level * 0.15;
-    return Math.max(0, base + eq.mpr + (sk.mprAdd || 0));
+    return Math.max(0, base + eq.mpr + (sk.mprAdd || 0) + buf.mprAdd);
   }
 
   // ─────────────────────────────────────────
@@ -307,6 +336,56 @@ const State = (() => {
   // 状态访问器（供其他模块使用）
   // ─────────────────────────────────────────
 
+  // ─────────────────────────────────────────
+  // 属性训练系统（金币消耗）
+  // ─────────────────────────────────────────
+
+  /**
+   * 训练费用：base * 1.6^n（n = 已训练次数）
+   * atk base=300, def base=200, hp base=150, spd base=1000
+   */
+  const TRAIN_BASE = { atk: 300, def: 200, hp: 150, spd: 1000 };
+
+  function getTrainCost(stat) {
+    const n = (data.training && data.training[stat]) || 0;
+    const base = TRAIN_BASE[stat] || 300;
+    return Math.floor(base * Math.pow(1.6, n));
+  }
+
+  /**
+   * 训练指定属性：消耗金币，永久提升基础属性
+   * atk/def/hp: 各+1/+1/+5，spd: +0.05
+   */
+  function train(stat) {
+    if (!TRAIN_BASE[stat]) return;
+    if (!data.training) data.training = { atk: 0, def: 0, hp: 0, spd: 0 };
+
+    const cost = getTrainCost(stat);
+    if (data.hero.gold < cost) {
+      if (window.UI) UI.addLog(`>> Need ${cost}g to train ${stat.toUpperCase()}. (Have ${data.hero.gold}g)`, "red");
+      return;
+    }
+    data.hero.gold -= cost;
+    data.training[stat] = (data.training[stat] || 0) + 1;
+
+    // 应用属性提升
+    if (stat === "atk") {
+      data.hero.baseAtk += 1;
+      if (window.UI) UI.addLog(`>> [TRAINING] Base ATK +1 → ${data.hero.baseAtk} (-${cost}g)`, "green");
+    } else if (stat === "def") {
+      data.hero.baseDef += 1;
+      if (window.UI) UI.addLog(`>> [TRAINING] Base DEF +1 → ${data.hero.baseDef} (-${cost}g)`, "green");
+    } else if (stat === "hp") {
+      data.hero.baseMaxHp += 5;
+      data.hero.hp = Math.min(data.hero.hp + 5, getTotalMaxHp());
+      if (window.UI) UI.addLog(`>> [TRAINING] Base MaxHP +5 → ${data.hero.baseMaxHp} (-${cost}g)`, "green");
+    } else if (stat === "spd") {
+      data.hero.baseSpd = Math.round((data.hero.baseSpd + 0.05) * 100) / 100;
+      if (window.UI) UI.addLog(`>> [TRAINING] Base SPD +0.05 → ${data.hero.baseSpd.toFixed(2)} (-${cost}g)`, "green");
+    }
+    if (window.UI) UI.markSidePanelDirty();
+  }
+
   function get() { return data; }
 
   function set(newData) { data = newData; }
@@ -337,6 +416,12 @@ const State = (() => {
     addExp,
     levelUp,
     calcExpToNext,
+    // 属性训练
+    train,
+    getTrainCost,
+    TRAIN_BASE,
+    // 临时 buff（黑市）
+    getBuffBonus,
   };
 })();
 

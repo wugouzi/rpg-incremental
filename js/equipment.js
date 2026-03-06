@@ -394,6 +394,46 @@ const Equipment = (() => {
   }
 
   /**
+   * 洗练物品词缀（消耗金币，重新随机所有词缀，基础属性保留）
+   * 费用随品质递增：common 500g / rare 1500g / epic 5000g / legendary 20000g
+   * common 装备洗练后自动升为 rare（保证有词缀）
+   */
+  const REFORGE_COST = { common: 500, rare: 1500, epic: 5000, legendary: 20000 };
+
+  function reforge(item) {
+    const state = State.get();
+    // 找到该物品（背包 or 已装备）
+    const inInv = state.inventory.find(i => i.instanceId === item.instanceId);
+    const inEquip = Object.values(state.equipment).find(i => i && i.instanceId === item.instanceId);
+    if (!inInv && !inEquip) {
+      if (window.UI) UI.addLog(">> Item not found.", "red");
+      return;
+    }
+    const target = inInv || inEquip;
+
+    // common 洗练自动升 rare
+    const rarity = target.rarity === "common" ? "rare" : target.rarity;
+    const cost = REFORGE_COST[target.rarity] || REFORGE_COST.common;
+
+    if (state.hero.gold < cost) {
+      if (window.UI) UI.addLog(`>> Need ${cost}g to reforge. (Have ${state.hero.gold}g)`, "red");
+      return;
+    }
+    state.hero.gold -= cost;
+
+    // 重新掷词缀
+    const newAffixes = rollAffixes(target.slot, rarity);
+    target.affixes = newAffixes;
+    target.rarity  = rarity;
+
+    const affixNames = newAffixes.map(a => a.name).join(", ") || "(none)";
+    if (window.UI) {
+      UI.addLog(`>> Reforged ${target.name}! New affixes: ${affixNames} (-${cost}g)`, "cyan");
+      UI.markSidePanelDirty();
+    }
+  }
+
+  /**
    * 强化物品（消耗金币，提升 enhanceLevel）
    * 强化费用：100 * (enhanceLevel + 1)^1.5
    * 强化上限：10 级
@@ -485,6 +525,7 @@ const Equipment = (() => {
     RARITY,
     RARITY_CONFIG,
     RARITY_UPGRADE,
+    REFORGE_COST,
     createItem,
     getItemTotalStats,
     rollAffixes,
@@ -492,6 +533,7 @@ const Equipment = (() => {
     unequip,
     sell,
     enhance,
+    reforge,
     buy,
     getShopItems,
     addToInventory,

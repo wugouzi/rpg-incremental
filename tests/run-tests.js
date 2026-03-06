@@ -74,6 +74,7 @@ const gameModules = [
   "../js/combat.js",
   "../js/prestige.js",
   "../js/save.js",
+  "../js/blackmarket.js",
 ];
 
 gameModules.forEach(rel => {
@@ -103,6 +104,7 @@ const testFiles = [
   "test-ui-dirty.js",
   "test-pyro-ui.js",
   "test-new-features.js",
+  "test-money-sink.js",
 ];
 
 console.log(gr("Running tests...\n"));

@@ -798,10 +798,11 @@ if (window.UI) {
       state.hero.mp = Math.min(maxMp, state.hero.mp + eqBonus.mpOnKill);
     }
 
-    // 掉落加成
-    const dropBonus = State.getTotalDropBonus();
-    const goldBonus = State.getTotalGoldBonus();
-    const expBonus  = State.getTotalExpBonus();
+    // 掉落加成（含黑市 buff 加成）
+    const buffBonus = State.getBuffBonus();
+    const dropBonus = State.getTotalDropBonus() + (buffBonus.dropPct || 0);
+    const goldBonus = State.getTotalGoldBonus() + (buffBonus.goldPct || 0);
+    const expBonus  = State.getTotalExpBonus()  + (buffBonus.expPct  || 0);
 
     const bonusedGold = Math.floor(goldGain * (1 + goldBonus / 100));
     const extraGold = bonusedGold - goldGain;
