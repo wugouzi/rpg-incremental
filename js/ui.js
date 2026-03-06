@@ -632,11 +632,12 @@ const UI = (() => {
       html += `<div class="tt-stat">  ${label.padEnd(8)}: ${_fmtStatVal(k, base[k])}</div>`;
     });
 
-    // 词缀
+    // 词缀（显示词缀名 + 属性类型 + 数值）
     if (item.affixes && item.affixes.length > 0) {
       html += `<div class="tt-divider">────────────────────</div>`;
       item.affixes.forEach(a => {
-        html += `<div class="tt-affix">  ✦ ${a.name}: ${_fmtStatVal(a.stat, a.value)}</div>`;
+        const statLabel = STAT_LABELS[a.stat] || a.stat;
+        html += `<div class="tt-affix">  ✦ ${a.name} <span style="color:#6e738d">[${statLabel}]</span>: ${_fmtStatVal(a.stat, a.value)}</div>`;
       });
     }
 
@@ -647,7 +648,16 @@ const UI = (() => {
       const allKeys  = new Set([...Object.keys(myTotal), ...Object.keys(cmpTotal)]);
       let hasDiff = false;
       let diffHTML = "";
-      allKeys.forEach(k => {
+      // 按固定顺序排列 diff 行（主属性在前，抗性在后）
+      const DIFF_ORDER = ["atk","def","hp","mp","spd","crit","hpr","mpr",
+        "fireRes","iceRes","lightningRes","poisonRes","physRes",
+        "dropBonus","goldBonus","expBonus"];
+      const sortedKeys = [
+        ...DIFF_ORDER.filter(k => allKeys.has(k)),
+        ...[...allKeys].filter(k => !DIFF_ORDER.includes(k)),
+      ];
+      const PCT_STATS = new Set(["fireRes","iceRes","lightningRes","poisonRes","physRes","dropBonus","goldBonus","expBonus"]);
+      sortedKeys.forEach(k => {
         const mine = myTotal[k] || 0;
         const theirs = cmpTotal[k] || 0;
         const diff = mine - theirs;
@@ -655,11 +665,13 @@ const UI = (() => {
         hasDiff = true;
         const label = STAT_LABELS[k] || k;
         const cls = diff > 0 ? "tt-up" : "tt-down";
+        const sign = diff > 0 ? "+" : "";
         let diffStr;
-        if (k === "crit")        diffStr = `${diff > 0 ? "+" : ""}${(diff * 100).toFixed(1)}%`;
-        else if (k === "spd")    diffStr = `${diff > 0 ? "+" : ""}${diff.toFixed(2)}`;
-        else if (k === "hpr" || k === "mpr") diffStr = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}/s`;
-        else                     diffStr = `${diff > 0 ? "+" : ""}${Math.round(diff)}`;
+        if (k === "crit")           diffStr = `${sign}${(diff * 100).toFixed(1)}%`;
+        else if (k === "spd")       diffStr = `${sign}${diff.toFixed(2)}`;
+        else if (k === "hpr" || k === "mpr") diffStr = `${sign}${diff.toFixed(1)}/s`;
+        else if (PCT_STATS.has(k))  diffStr = `${sign}${Math.round(diff)}%`;
+        else                        diffStr = `${sign}${Math.round(diff)}`;
         diffHTML += `<div class="${cls}">  ${label.padEnd(8)}: ${diffStr}</div>`;
       });
       if (hasDiff) {
