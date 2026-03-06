@@ -155,3 +155,70 @@ describe("侧面板 Dirty Flag — hover 保护", () => {
     assert.equal(p.rebuildCount, 2, "第二轮离开后应再补刷一次");
   });
 });
+
+describe("侧面板 — 点击操作绕过 hover 阻断立即刷新", () => {
+  // 模拟 onSidePanelClick 末尾直接调用 refreshSidePanel()（不经过 dirty 判断）
+  function makePanelController() {
+    let dirty    = false;
+    let hovered  = false;
+    let rebuildCount = 0;
+
+    function markDirty() { dirty = true; }
+    function rebuild()   { dirty = false; rebuildCount++; }
+
+    function refreshIfDirty() {
+      if (!dirty)  return;
+      if (hovered) return;
+      rebuild();
+    }
+
+    // 模拟 onSidePanelClick 末尾：直接调用 refreshSidePanel()，绕过 hover 检查
+    function onClickAction() {
+      rebuild(); // 等价于直接 refreshSidePanel()
+    }
+
+    function onMouseEnter() { hovered = true; }
+    function onMouseLeave() {
+      hovered = false;
+      if (dirty) rebuild();
+    }
+
+    return { markDirty, refreshIfDirty, onClickAction, onMouseEnter, onMouseLeave,
+             get rebuildCount() { return rebuildCount; },
+             get dirty()        { return dirty; } };
+  }
+
+  it("hover 期间点击操作立即触发重建，不需要等 mouseleave", () => {
+    const p = makePanelController();
+    p.onMouseEnter();
+    p.markDirty();
+    p.onClickAction(); // 点击 Equip/Sell 等按钮，直接刷新
+    assert.equal(p.rebuildCount, 1, "点击操作应立即重建，不等 mouseleave");
+  });
+
+  it("点击后 dirty 清除，mouseleave 不会再触发多余重建", () => {
+    const p = makePanelController();
+    p.onMouseEnter();
+    p.markDirty();
+    p.onClickAction(); // 点击立即刷新
+    assert.equal(p.dirty, false, "点击后 dirty 应清除");
+    p.onMouseLeave(); // 离开时不应再重建
+    assert.equal(p.rebuildCount, 1, "mouseleave 时不应再次重建（dirty 已清除）");
+  });
+
+  it("hover 期间多次标脏后点击，只重建一次", () => {
+    const p = makePanelController();
+    p.onMouseEnter();
+    p.markDirty();
+    p.markDirty();
+    p.markDirty();
+    p.onClickAction();
+    assert.equal(p.rebuildCount, 1, "多次标脏后点击应只重建一次");
+  });
+
+  it("不 hover 时点击操作也能立即刷新", () => {
+    const p = makePanelController();
+    p.onClickAction();
+    assert.equal(p.rebuildCount, 1, "不 hover 时点击也应立即重建");
+  });
+});

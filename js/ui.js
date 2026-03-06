@@ -1340,12 +1340,10 @@ const UI = (() => {
       }
       case "chooseClass": {
         Skills.chooseClass(target.dataset.class);
-        refreshSidePanel();
         break;
       }
       case "enterZone": {
         Zones.enterZone(target.dataset.zone);
-        refreshSidePanel();
         break;
       }
       case "challengeBoss": {
@@ -1355,10 +1353,13 @@ const UI = (() => {
       case "toggleFold": {
         const group = target.dataset.foldGroup;
         _skillFold[group] = !_skillFold[group];
-        refreshSidePanel();
         break;
       }
     }
+    // 点击任何操作后立即刷新侧面板（绕过 hover 阻断，确保无延迟响应）
+    // 同时隐藏 tooltip（防止点击后 tooltip 残留）
+    _hideTooltip();
+    refreshSidePanel();
   }
 
   return {
