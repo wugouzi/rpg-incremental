@@ -422,6 +422,35 @@ button#btn-reset:hover {
   color: #cad3f5;
 }
 
+/* ── 装备属性 Tooltip ─────────────────────── */
+#item-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  background: #181926;
+  border: 1px solid #494d64;
+  padding: 8px 12px;
+  font-family: 'Courier New', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #cad3f5;
+  white-space: pre;
+  pointer-events: none;
+  max-width: 320px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+}
+#item-tooltip.visible {
+  display: block;
+}
+#item-tooltip .tt-name     { color: #cba6f7; font-weight: bold; }
+#item-tooltip .tt-rarity   { font-size: 11px; }
+#item-tooltip .tt-stat     { color: #cad3f5; }
+#item-tooltip .tt-affix    { color: #89dceb; }
+#item-tooltip .tt-up       { color: #a6e3a1; }
+#item-tooltip .tt-down     { color: #f38ba8; }
+#item-tooltip .tt-same     { color: #6e738d; }
+#item-tooltip .tt-divider  { color: #363a4f; }
+
 /* ── 响应式：小屏幕 ────────────────────────── */
 @media (max-width: 900px) {
   html, body { font-size: 11px; }

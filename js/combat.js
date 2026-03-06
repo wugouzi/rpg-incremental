@@ -221,9 +221,9 @@ const Combat = (() => {
       }
     }
 
-    if (window.UI) {
-      UI.addLog(`>> [${Zones.getZone(state.currentZone).name}] ${monster.name} appears!`, "white");
-    }
+if (window.UI) {
+  UI.addLog(`>> [${Zones.getZone(state.currentZone).name}] ${monster.name} appears!`, "white", "combat");
+}
   }
 
   /**

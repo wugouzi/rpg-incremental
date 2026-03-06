@@ -463,6 +463,9 @@ const UI = (() => {
         btn.dataset.action = "unequip";
         btn.dataset.slot = slot;
         row.appendChild(btn);
+
+        // Hover 显示完整属性
+        _bindTooltip(row, item, null);
       } else {
         const label = document.createElement("span");
         label.textContent = `  ${slotLabels[slot].padEnd(8)}: -- empty --`;
@@ -470,16 +473,6 @@ const UI = (() => {
         row.appendChild(label);
       }
       el.appendChild(row);
-
-      // 装备的词缀行
-      if (item && item.affixes && item.affixes.length > 0) {
-        const affixRow = document.createElement("div");
-        const affixStr = item.affixes.map(a => _affixLabel(a)).join("  ");
-        affixRow.textContent = `           ✦ ${affixStr}`;
-        affixRow.style.color = COLOR_MAP.cyan;
-        affixRow.style.fontSize = "0.85em";
-        el.appendChild(affixRow);
-      }
     });
 
     // 背包
@@ -497,16 +490,16 @@ const UI = (() => {
     } else {
       state.inventory.forEach((item, idx) => {
         const itemColor = COLOR_MAP[Equipment.getRarityColor(item.rarity)] || COLOR_MAP.white;
+        const rt = RARITY_TAG[item.rarity] || RARITY_TAG.common;
 
-        // 主行：物品名 + 基础属性 + 操作按钮
+        // 主行：物品名 + 品质标签 + 操作按钮（属性移到 tooltip）
         const row = document.createElement("div");
         row.style.display = "flex";
         row.style.alignItems = "baseline";
         row.style.gap = "4px";
 
-        const statStr = _itemStatStr(item);
         const label = document.createElement("span");
-        label.textContent = `  ${String(idx+1).padStart(2)}. ${item.name}${item.enhanceLevel > 0 ? ` +${item.enhanceLevel}` : ""} ${statStr}`;
+        label.textContent = `  ${String(idx+1).padStart(2)}. ${item.name}${item.enhanceLevel > 0 ? ` +${item.enhanceLevel}` : ""}${rt.tag ? " " + rt.tag : ""}`;
         label.style.color = itemColor;
         label.style.flex = "1";
         row.appendChild(label);
@@ -520,7 +513,7 @@ const UI = (() => {
 
         const btnEnh = document.createElement("span");
         const enhCost = Math.floor(100 * Math.pow(item.enhanceLevel + 1, 1.5));
-        btnEnh.textContent = `[+Enh ${enhCost}g]`;
+        btnEnh.textContent = `[+${enhCost}g]`;
         btnEnh.className = item.enhanceLevel >= 10 ? "btn btn-disabled" : "btn";
         btnEnh.dataset.action = "enhance";
         btnEnh.dataset.iid = item.instanceId;
@@ -533,17 +526,11 @@ const UI = (() => {
         btnSell.dataset.iid = item.instanceId;
         row.appendChild(btnSell);
 
-        el.appendChild(row);
+        // Hover tooltip：显示属性 + 与已装备对比
+        const equipped = state.equipment[item.slot] || null;
+        _bindTooltip(row, item, equipped);
 
-        // 词缀行（如有）
-        if (item.affixes && item.affixes.length > 0) {
-          const affixRow = document.createElement("div");
-          const affixStr = item.affixes.map(a => _affixLabel(a)).join("  ");
-          affixRow.textContent = `       ✦ ${affixStr}`;
-          affixRow.style.color = COLOR_MAP.cyan;
-          affixRow.style.fontSize = "0.85em";
-          el.appendChild(affixRow);
-        }
+        el.appendChild(row);
       });
     }
   }
@@ -582,6 +569,142 @@ const UI = (() => {
       valStr = `+${value}${short[stat] || stat}`;
     }
     return `[${name}: ${valStr}]`;
+  }
+
+  // ─────────────────────────────────────────
+  // 装备 Tooltip 系统
+  // ─────────────────────────────────────────
+
+  const STAT_LABELS = {
+    atk: "ATK", def: "DEF", hp: "HP", mp: "MP",
+    spd: "SPD", crit: "CRIT",
+    hpr: "HPR", mpr: "MPR",
+    fireRes: "Fire Res", iceRes: "Ice Res",
+    lightningRes: "Ltng Res", poisonRes: "Psn Res", physRes: "Phys Res",
+    dropBonus: "Drop%", goldBonus: "Gold%", expBonus: "EXP%",
+  };
+
+  const RARITY_COLORS = {
+    common: "", rare: "cyan", epic: "yellow", legendary: "red",
+  };
+
+  /** 格式化单个属性值用于 tooltip */
+  function _fmtStatVal(key, val) {
+    if (key === "crit")  return `+${(val * 100).toFixed(1)}%`;
+    if (key === "spd")   return `+${val.toFixed(2)}`;
+    if (["fireRes","iceRes","lightningRes","poisonRes","physRes","dropBonus","goldBonus","expBonus"].includes(key))
+      return `+${val}%`;
+    if (key === "hpr" || key === "mpr") return `+${val.toFixed(1)}/s`;
+    return `+${val}`;
+  }
+
+  /** 构建 tooltip 的 innerHTML，支持可选的"与 compared 对比"模式 */
+  function _buildTooltipHTML(item, compared) {
+    const rt = RARITY_TAG[item.rarity] || RARITY_TAG.common;
+    const rarityColor = RARITY_COLORS[item.rarity] || "";
+    const rarityStr   = rt.tag ? ` ${rt.tag}` : "";
+    const enhance     = item.enhanceLevel > 0 ? ` +${item.enhanceLevel}` : "";
+
+    let html = "";
+    // 标题行
+    html += `<div class="tt-name">${item.name}${enhance}`;
+    if (rt.tag) html += ` <span style="color:${COLOR_MAP[rarityColor] || ''}">${rt.tag}</span>`;
+    html += `</div>`;
+    html += `<div class="tt-divider">────────────────────</div>`;
+
+    // 基础属性
+    const base = item.stats || {};
+    const STAT_ORDER = ["atk","def","hp","mp","spd","crit","hpr","mpr"];
+    let hasBase = false;
+    STAT_ORDER.forEach(k => {
+      if (!base[k]) return;
+      hasBase = true;
+      const label = STAT_LABELS[k] || k;
+      const valStr = _fmtStatVal(k, base[k]);
+      html += `<div class="tt-stat">  ${label.padEnd(8)}: ${valStr}</div>`;
+    });
+    // 其他基础属性（抗性等）
+    Object.keys(base).forEach(k => {
+      if (STAT_ORDER.includes(k) || !base[k]) return;
+      const label = STAT_LABELS[k] || k;
+      html += `<div class="tt-stat">  ${label.padEnd(8)}: ${_fmtStatVal(k, base[k])}</div>`;
+    });
+
+    // 词缀
+    if (item.affixes && item.affixes.length > 0) {
+      html += `<div class="tt-divider">────────────────────</div>`;
+      item.affixes.forEach(a => {
+        html += `<div class="tt-affix">  ✦ ${a.name}: ${_fmtStatVal(a.stat, a.value)}</div>`;
+      });
+    }
+
+    // 与已装备物品对比
+    if (compared) {
+      const myTotal  = Equipment.getItemTotalStats(item);
+      const cmpTotal = Equipment.getItemTotalStats(compared);
+      const allKeys  = new Set([...Object.keys(myTotal), ...Object.keys(cmpTotal)]);
+      let hasDiff = false;
+      let diffHTML = "";
+      allKeys.forEach(k => {
+        const mine = myTotal[k] || 0;
+        const theirs = cmpTotal[k] || 0;
+        const diff = mine - theirs;
+        if (Math.abs(diff) < 0.001) return;
+        hasDiff = true;
+        const label = STAT_LABELS[k] || k;
+        const cls = diff > 0 ? "tt-up" : "tt-down";
+        let diffStr;
+        if (k === "crit")        diffStr = `${diff > 0 ? "+" : ""}${(diff * 100).toFixed(1)}%`;
+        else if (k === "spd")    diffStr = `${diff > 0 ? "+" : ""}${diff.toFixed(2)}`;
+        else if (k === "hpr" || k === "mpr") diffStr = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}/s`;
+        else                     diffStr = `${diff > 0 ? "+" : ""}${Math.round(diff)}`;
+        diffHTML += `<div class="${cls}">  ${label.padEnd(8)}: ${diffStr}</div>`;
+      });
+      if (hasDiff) {
+        html += `<div class="tt-divider">── vs equipped ─────</div>`;
+        html += diffHTML;
+      } else {
+        html += `<div class="tt-divider">── vs equipped ─────</div>`;
+        html += `<div class="tt-same">  (same stats)</div>`;
+      }
+    }
+
+    return html;
+  }
+
+  /** 将 tooltip 定位到鼠标旁边并显示 */
+  function _showTooltip(e, item, compared) {
+    const tt = document.getElementById("item-tooltip");
+    if (!tt) return;
+    tt.innerHTML = _buildTooltipHTML(item, compared);
+    tt.classList.add("visible");
+    _posTooltip(e);
+  }
+
+  function _posTooltip(e) {
+    const tt = document.getElementById("item-tooltip");
+    if (!tt || !tt.classList.contains("visible")) return;
+    const pad = 14;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    // 防止超出右侧/底部
+    const rect = tt.getBoundingClientRect();
+    if (x + rect.width  > vw) x = e.clientX - rect.width  - pad;
+    if (y + rect.height > vh) y = e.clientY - rect.height - pad;
+    tt.style.left = x + "px";
+    tt.style.top  = y + "px";
+  }
+
+  function _hideTooltip() {
+    const tt = document.getElementById("item-tooltip");
+    if (tt) tt.classList.remove("visible");
+  }
+
+  /** 为 DOM 元素绑定 tooltip 事件 */
+  function _bindTooltip(el, item, compared) {
+    el.addEventListener("mouseenter", e => _showTooltip(e, item, compared));
+    el.addEventListener("mousemove",  e => _posTooltip(e));
+    el.addEventListener("mouseleave", _hideTooltip);
   }
 
   // ─────────────────────────────────────────
