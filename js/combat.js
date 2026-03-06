@@ -997,6 +997,9 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
       restTimer = 0;
     }
 
+    // 战斗中也持续自然回复（不加速）
+    tickRegen(delta, false);
+
     if (state.hero.hp <= 0) return;
 
     const effects = Skills.getEffects();

@@ -203,6 +203,7 @@ incremental/
 - [x] 日志过滤栏：在战斗日志上方增加 [ALL] / [COMBAT] / [LOOT] 三个过滤 tab；每条日志自动推断分类（攻击/技能伤害→combat，掉落/金币/升级→loot），点击 tab 即时显示/隐藏，不重建 DOM
 - [x] 技能面板默认折叠：进入 SKILLS 标签时所有分组默认收起（▶），用户手动展开（▼）
 - [x] 法师技能子分组折叠（v0.9.2）：MAGE SKILLS 大组展开后内部细分为 4 个子折叠组（BASE SKILLS / CHOOSE SPEC / 🔥PYROMANCER / ❄️CRYOMANCER / ⚡STORMCALLER），每个子组独立可点击折叠，默认收起；子组 foldGroup key 为 `mage_base`/`mage_spec_gate`/`mage_pyro`/`mage_cryo`/`mage_storm`；单技能行渲染抽取为 `_renderSkillRow` 辅助函数；新增 `tests/test-skill-subgroups.js`（24 项测试），总计 321 通过
+- [x] 战斗中 HP/MP 自然回复（v0.9.4）：`tickRegen` 现在在战斗分支也被调用（`resting=false`），英雄在战斗中以正常速率持续回复 HP/MP；新增 4 项战斗回复测试（353 通过）
 - [x] REST/Regen 双 Bug 修复（v0.9.3）：① `main.js` 非战斗状态不调用 `Combat.tick` 导致 REST 和自然回复完全无效；② `tickRegen` 用 `Math.max(1, Math.round(hpr))` 导致 HPR=0.2 时固定每秒回 1（5×偏快）；③ `tickRegen` 末尾调用不存在的 `UI.markDirty` 导致 UI 不刷新。修复：去掉 `main.js` 的 `currentMonster` 守卫；换用小数累计器（`hpRegenAcc`/`mpRegenAcc`）按 delta/1000 逐 tick 积分；改 `UI.markSidePanelDirty()`；新增 `tests/test-regen.js`（28 项测试，覆盖 HPR/MPR 基础值、小数累计精度、MP 回复、REST 3× 加速、自动结束、战斗中断），总计 349 通过
 
 ---

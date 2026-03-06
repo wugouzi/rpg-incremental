@@ -290,3 +290,60 @@ describe("REST — 战斗状态交互", () => {
     s.currentMonster = null; // 清理
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// 7. 战斗中自然回复
+// ═══════════════════════════════════════════════════════
+
+describe("战斗中自然回复", () => {
+  // 注入一个"静止"怪物（atk=0 不会反击，让我们只测回复）
+  function injectMob(s) {
+    s.currentMonster = { id: "mob", name: "Dummy", currentHp: 999, maxHp: 999, atk: 0, def: 0, spd: 0.01, element: null, expReward: 0, goldMin: 0, goldMax: 0, dropTable: [] };
+  }
+
+  it("Lv.10（HPR=1/s）：战斗中 tick 1000ms 后 HP +1", () => {
+    regenSetup({ level: 10, hp: 50, maxHp: 100 });
+    const s = State.get();
+    injectMob(s);
+    const before = s.hero.hp;
+    tickMs(1000);
+    assert.equal(s.hero.hp, before + 1, "战斗中 HPR 应正常生效");
+    s.currentMonster = null;
+  });
+
+  it("Lv.10（MPR=0.5/s）：战斗中 tick 2000ms 后 MP +1", () => {
+    regenSetup({ level: 10, mp: 20, maxMp: 50 });
+    const s = State.get();
+    injectMob(s);
+    const before = s.hero.mp;
+    tickMs(2000);
+    assert.equal(s.hero.mp, before + 1, "战斗中 MPR 应正常生效");
+    s.currentMonster = null;
+  });
+
+  it("战斗中 HP 回复不超过 maxHp", () => {
+    regenSetup({ level: 10, hp: 99, maxHp: 100 });
+    const s = State.get();
+    injectMob(s);
+    tickMs(5000);
+    assert.equal(s.hero.hp, 100, "HP 不应超过上限");
+    s.currentMonster = null;
+  });
+
+  it("战斗中 HP 回复速率与非战斗相同（1×，非 REST 加速）", () => {
+    // 非战斗
+    regenSetup({ level: 10, hp: 50, maxHp: 100 });
+    tickMs(3000);
+    const noFightHealed = State.get().hero.hp - 50;
+
+    // 战斗中（atk=0 的假怪物）
+    regenSetup({ level: 10, hp: 50, maxHp: 100 });
+    const s = State.get();
+    injectMob(s);
+    tickMs(3000);
+    const fightHealed = s.hero.hp - 50;
+    s.currentMonster = null;
+
+    assert.equal(fightHealed, noFightHealed, "战斗中回复量应与非战斗一致");
+  });
+});
