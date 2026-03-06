@@ -242,14 +242,14 @@ describe("Skills.getEffects — 法师专精被动", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("Pyromancer — 战斗机制", () => {
-  it("startFight 重置 burnStack 为 0", () => {
-    mageSetup({ spec: "pyro" });
-    const s = State.get();
-    s.mage.burnStack = 5; // 模拟上场有残留
-    const mob = makeMob(500, 10, 0, 0.1);
-    Combat.startFight(mob);
-    assert.equal(s.mage.burnStack, 0);
-  });
+it("startFight 保留 burnStack（余烬跨战斗延续）", () => {
+mageSetup({ spec: "pyro" });
+const s = State.get();
+s.mage.burnStack = 3; // 模拟上场有余烬
+const mob = makeMob(500, 10, 0, 0.1);
+Combat.startFight(mob);
+assert.equal(s.mage.burnStack, 3, "burnStack 应保留，不清零");
+});
 
   it("Ignite 技能（直接调用 heroAttack）叠加灼烧层", () => {
     mageSetup({ spec: "pyro", skills: { spec_pyro: true, ignite: true } });

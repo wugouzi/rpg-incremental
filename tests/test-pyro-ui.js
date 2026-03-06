@@ -250,3 +250,49 @@ describe("Combat — Pyro/Cryo/Storm 状态暴露给 UI", () => {
     assert.equal(Combat.heatShieldActive, false, "startFight 后 heatShieldActive 应重置为 false");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Burn 跨战斗保留测试
+// ─────────────────────────────────────────────────────────────────
+
+describe("Pyro — Burn 跨战斗保留机制", () => {
+  function makePyroMage(burnStack) {
+    State.reset();
+    const state = State.get();
+    state.hero.class = "mage";
+    state.mage = {
+      spec: "pyro", burnStack: burnStack, burnDotTimer: 0,
+      frozen: false, freezeTimer: 0, chillStack: 0,
+      charge: 0, arcaneWardHp: 0, blinkImmune: false,
+      blinkImmuneTimer: 0, counterspellActive: false,
+      counterspellTimer: 0, counterspellHits: 0,
+      timeWarpActive: false, timeWarpTimer: 0,
+      lastRiteUsed: false, spellEchoCount: 0,
+      leyLineReady: false, nextFightChillBonus: 0,
+    };
+    return state;
+  }
+
+  it("startFight 后 burnStack 保持不变（跨场保留）", () => {
+    const state = makePyroMage(3);
+    const monster = { name: "TestMob", currentHp: 100, maxHp: 100, atk: 5, def: 0, spd: 1, element: "fire", isBoss: false };
+    Combat.startFight(monster);
+    assert.equal(state.mage.burnStack, 3, "startFight 不应清零 burnStack，应保留 3 层");
+  });
+
+  it("startFight 后 burnDotTimer 重置为 0", () => {
+    const state = makePyroMage(3);
+    state.mage.burnDotTimer = 800; // 模拟上一场战斗累积的计时
+    const monster = { name: "TestMob", currentHp: 100, maxHp: 100, atk: 5, def: 0, spd: 1, element: "fire", isBoss: false };
+    Combat.startFight(monster);
+    assert.equal(state.mage.burnDotTimer, 0, "startFight 应将 burnDotTimer 重置为 0");
+  });
+
+  it("burnStack=0 时 startFight 无日志（不打印空携带）", () => {
+    // 此测试仅验证 burnStack 仍为 0（不能直接捕捉日志，但确认无副作用）
+    const state = makePyroMage(0);
+    const monster = { name: "TestMob", currentHp: 100, maxHp: 100, atk: 5, def: 0, spd: 1, element: "fire", isBoss: false };
+    Combat.startFight(monster);
+    assert.equal(state.mage.burnStack, 0, "无余烬时 burnStack 仍为 0");
+  });
+});

@@ -173,9 +173,13 @@ const Combat = (() => {
 
     // 重置法师 per-fight 状态
     if (state.mage) {
-      // 清 per-fight 状态
-      state.mage.burnStack    = 0;
+      // Pyro: burn 层数跨战斗保留（火焰余烬延续到下一个怪物）
+      // 只重置 DoT 计时器，让 DoT 对新怪重新开始计时
       state.mage.burnDotTimer = 0;
+      // 注意：burnStack 不清零
+      if (state.mage.burnStack > 0 && state.mage.spec === "pyro" && window.UI) {
+        UI.addLog(`>> [PYRO] Embers carry over: ${state.mage.burnStack} Burn stacks!`, "red");
+      }
       state.mage.frozen       = false;
       state.mage.freezeTimer  = 0;
       state.mage.charge       = 0;   // Storm: 每场战斗充能从 0 开始
@@ -854,6 +858,10 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     heatShieldActive = false;
     lightningRodActive = false;
     state.killStreak = 0; // 死亡重置连胜
+    // Pyro：死亡时余烬熄灭
+    if (state.mage && state.mage.spec === "pyro") {
+      state.mage.burnStack = 0;
+    }
 
     UI.addLog(`>> You died! Lost ${penalty}g. (HP restored to 30%)`, "red");
     if (window.UI) UI.markSidePanelDirty();
