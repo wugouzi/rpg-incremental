@@ -25,8 +25,9 @@ const Combat = (() => {
   let isResting = false;
   let restTimer = 0;         // Rest 持续计时（ms）
   const REST_DURATION = 5000; // Rest 持续 5 秒后自动结束
-  const REGEN_INTERVAL = 1000; // 自然回复每 1 秒一次
-  let regenTimer = 0;        // 自然回复计时器
+  // 小数累计（避免 hpr/mpr < 1 时被 round 到 0）
+  let hpRegenAcc = 0;        // HP 回复小数累计
+  let mpRegenAcc = 0;        // MP 回复小数累计
 
   // ─────────────────────────────────────────
   // 辅助：获取充能上限
@@ -897,23 +898,36 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     const maxMp = State.getTotalMaxMp();
     if (state.hero.hp >= maxHp && state.hero.mp >= maxMp) return;
 
-    regenTimer += delta;
-    if (regenTimer < REGEN_INTERVAL) return;
-    regenTimer -= REGEN_INTERVAL;
-
     const hpr = State.getTotalHpr();
     const mpr = State.getTotalMpr();
     // Rest 模式：3× 回复速率
     const mult = resting ? 3 : 1;
+    // delta 单位 ms → 换算成秒
+    const sec = delta / 1000;
 
+    // 累计小数，整数部分才实际加到 HP/MP（正确处理 hpr < 1 的情况）
     if (state.hero.hp < maxHp) {
-      const heal = Math.max(1, Math.round(hpr * mult));
-      state.hero.hp = Math.min(maxHp, state.hero.hp + heal);
+      hpRegenAcc += hpr * mult * sec;
+      const whole = Math.floor(hpRegenAcc);
+      if (whole > 0) {
+        hpRegenAcc -= whole;
+        state.hero.hp = Math.min(maxHp, state.hero.hp + whole);
+      }
+    } else {
+      hpRegenAcc = 0; // 满血后重置，防止溢出累积
     }
+
     if (state.hero.mp < maxMp) {
-      const mpRec = Math.max(0, Math.round(mpr * mult));
-      if (mpRec > 0) state.hero.mp = Math.min(maxMp, state.hero.mp + mpRec);
+      mpRegenAcc += mpr * mult * sec;
+      const whole = Math.floor(mpRegenAcc);
+      if (whole > 0) {
+        mpRegenAcc -= whole;
+        state.hero.mp = Math.min(maxMp, state.hero.mp + whole);
+      }
+    } else {
+      mpRegenAcc = 0;
     }
+
     if (window.UI) UI.markDirty && UI.markDirty();
   }
 
@@ -935,7 +949,8 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     }
     isResting = true;
     restTimer = 0;
-    regenTimer = 0;
+    hpRegenAcc = 0;
+    mpRegenAcc = 0;
     if (window.UI) UI.addLog(">> Resting... (HP/MP recover 3x faster)", "green");
     if (window.UI) UI.markSidePanelDirty();
   }
