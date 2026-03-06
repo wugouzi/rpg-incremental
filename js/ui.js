@@ -253,7 +253,7 @@ const UI = (() => {
       const eliteTag = monster.isElite ? " ⚠ELITE" : "";
       monsterLine = `  MOB : ${monster.name}${elemTag}${eliteTag}\n  HP  : ${Utils.formatBar(monster.currentHp, monster.maxHp, 12)} ${monster.currentHp}/${monster.maxHp}`;
     } else {
-      monsterLine = `  MOB : -- idle --`;
+      monsterLine = `  MOB : -- idle --\n  HP  :`;
     }
 
     const heroHp = state.hero.hp;
