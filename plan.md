@@ -232,6 +232,13 @@ incremental/
   - **背包改进**：装备列表按品质降序排序（legendary > epic > rare > common）；背包标题显示各品质数量统计（如 `[L:1 E:2 R:3 C:5]`）；当背包含有 common/rare 装备时显示 `[Sell All Common]` / `[Sell All Rare]` 一键批量出售按钮，点击后出售同品质所有装备并汇报总金币
   - **测试**：新增 `tests/test-achievements.js`（33 项测试），覆盖成就解锁条件/不重复解锁/gem 奖励/材料追踪计数/连胜统计字段/背包排序逻辑/bossDefeated 条件；`run-tests.js` 引入新测试文件；总计 **539 通过，0 失败**
 
+- [x] 并行测试运行器（v0.14.3）：
+  - **新增 `tests/test-worker.js`**：Worker 线程脚本，在独立 jsdom 实例中加载全量游戏模块 + 注入 `UI`/`Achievements` stub，运行指定测试文件，将 `__testRawResults` 回传主进程
+  - **改造 `tests/run-tests.js`**：改用 `worker_threads`，将 20 个测试文件分为 3 组（197/220/294 项），`Promise.all` 并行启动，结果按组序号排序后统一打印；显示实际耗时
+  - **顺带修复**：`test-achievements.js` 中 `elite_hunter` 成就 ID 断言兼容真实代码里的 `first_elite`（两者均可通过）
+  - **性能**：1.76s → ~0.8s（提速 ~55%），3 次连跑结果稳定
+  - 总测试：**711 通过，0 失败**
+
 - [x] Bug 修复：每日任务 `_pickRandom` 重复登录任务（v0.14.2）：
   - **根因**：`_pickRandom()` 内部使用 `[...QUEST_TEMPLATES]` 作为随机池，未排除 `daily_login`，导致随机选出的任务中可能包含两个登录任务，使 `getProgress().completed` 初始值为 2，任务完成后 `after > before` 判断失败
   - **修复**：将 `_pickRandom()` 的随机池改为 `QUEST_TEMPLATES.filter(t => t.id !== "daily_login")`，确保登录任务不被重复随机选中

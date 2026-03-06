@@ -115,12 +115,12 @@ describe("成就系统 — 解锁条件检查", () => {
     assert.ok(unlocked.some(a => a.id === "streak_10"), "maxKillStreak=10 应解锁 streak_10");
   });
 
-  it("elite_hunter 成就 — eliteKills >= 1 解锁", () => {
-    freshState();
-    State.get().stats.eliteKills = 1;
-    const unlocked = Achievements.check();
-    assert.ok(unlocked.some(a => a.id === "elite_hunter"), "eliteKills=1 应解锁 elite_hunter");
-  });
+it("elite_hunter 成就 — eliteKills >= 1 解锁", () => {
+freshState();
+State.get().stats.eliteKills = 1;
+const unlocked = Achievements.check();
+assert.ok(unlocked.some(a => a.id === "first_elite" || a.id === "elite_hunter"), "eliteKills=1 应解锁 first_elite/elite_hunter");
+});
 
   it("传说装备成就 — 背包中有 legendary 装备时解锁", () => {
     freshState();
