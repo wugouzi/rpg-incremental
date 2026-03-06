@@ -928,7 +928,7 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
       mpRegenAcc = 0;
     }
 
-    if (window.UI) UI.markDirty && UI.markDirty();
+    if (window.UI) UI.markSidePanelDirty();
   }
 
   /**
