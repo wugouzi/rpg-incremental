@@ -251,6 +251,12 @@ incremental/
   - **测试修复**：`aceConsecutiveCrits` 重置测试移除 `withDeadeye`（其 `critAdd:0.15` 会让暴击率从 0 变 15% 导致随机暴击），改为仅解锁 `marksman_mastery` 以保证暴击率真正为 0
   - 总测试：**711 通过，0 失败**
 
+### v0.43 — Shop/GemShop UI 优化（2026-03-07）
+- **GemShop 排版修复**：永久升级和特殊解锁从两行（name + desc 并排 flex）改为单行（name/lv + 价格/MAX + 按钮），desc 改为 hover tooltip 显示，解决了 `flex:1` 导致 `Ascendant Power` 等名称每字母换行的问题
+- **Shop 物品 hover tooltip**：商店物品行隐藏内联属性字符串（`statStr`），改为鼠标悬停时弹出完整装备 tooltip（含词缀、与已装备对比）
+- **新增 `_bindGenericTooltip`**：通用 tooltip 绑定函数，用于非装备项（GemShop 升级/解锁等），统一复用 `item-tooltip` 元素
+- 总测试：**711 通过，0 失败**
+
 ---
 
 ## 待定问题（请修订）

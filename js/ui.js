@@ -1161,6 +1161,25 @@ const UI = (() => {
     el.addEventListener("mouseleave", _hideTooltip);
   }
 
+  /** 为任意元素绑定纯文字 tooltip（用于 GemShop / BlackMarket 等非装备项目） */
+  function _bindGenericTooltip(el, title, desc, icon) {
+    const buildHTML = () => {
+      let html = `<div class="tt-name">${icon ? icon + " " : ""}${title}</div>`;
+      html += `<div class="tt-divider">────────────────────</div>`;
+      html += `<div class="tt-stat" style="white-space:normal;max-width:240px">  ${desc}</div>`;
+      return html;
+    };
+    el.addEventListener("mouseenter", e => {
+      const tt = document.getElementById("item-tooltip");
+      if (!tt) return;
+      tt.innerHTML = buildHTML();
+      tt.classList.add("visible");
+      _posTooltip(e);
+    });
+    el.addEventListener("mousemove",  e => _posTooltip(e));
+    el.addEventListener("mouseleave", _hideTooltip);
+  }
+
   // ─────────────────────────────────────────
   // 技能 Tooltip
   // ─────────────────────────────────────────
@@ -1371,11 +1390,10 @@ const UI = (() => {
         row.style.alignItems = "baseline";
         row.style.gap = "4px";
 
-        const statStr = _itemStatStr(tpl);
         const canAfford = state.hero.gold >= tpl.buyPrice;
 
         const label = document.createElement("span");
-        label.textContent = `  ${tpl.name} ${statStr}`;
+        label.textContent = `  ${tpl.name}`;
         label.style.color = COLOR_MAP[Equipment.getRarityColor(tpl.rarity)] || COLOR_MAP.white;
         label.style.flex = "1";
         row.appendChild(label);
@@ -1393,6 +1411,10 @@ const UI = (() => {
         row.appendChild(btn);
 
         el.appendChild(row);
+
+        // Hover tooltip 显示完整装备详情（与已装备对比）
+        const equipped = state.hero.equipment && state.hero.equipment[tpl.slot];
+        _bindTooltip(label, tpl, equipped || null);
       });
     });
 
@@ -1519,11 +1541,13 @@ const UI = (() => {
       const maxed = lvl >= upg.maxLevel;
       const canAfford = gems >= cost && !maxed;
 
+      // 单行：icon + 名称(lv) + 价格/MAX + 按钮
       const row = document.createElement("div");
       row.style.display = "flex";
       row.style.alignItems = "baseline";
-      row.style.gap = "4px";
-      row.style.marginTop = "3px";
+      row.style.gap = "6px";
+      row.style.marginTop = "4px";
+      row.style.cursor = "default";
 
       const nameSpan = document.createElement("span");
       nameSpan.textContent = `  ${upg.icon} ${upg.name} (${lvl}/${upg.maxLevel})`;
@@ -1531,31 +1555,16 @@ const UI = (() => {
       nameSpan.style.flex = "1";
       row.appendChild(nameSpan);
 
-      const descSpan = document.createElement("span");
-      descSpan.textContent = upg.desc;
-      descSpan.style.color = COLOR_MAP.gray;
-      descSpan.style.fontSize = "0.82em";
-      row.appendChild(descSpan);
-
-      el.appendChild(row);
-
-      // 按钮行
-      const btnRow = document.createElement("div");
-      btnRow.style.marginLeft = "4px";
-      btnRow.style.display = "flex";
-      btnRow.style.gap = "6px";
-      btnRow.style.alignItems = "baseline";
-
       if (maxed) {
         const maxedSpan = document.createElement("span");
-        maxedSpan.textContent = "     [MAX]";
+        maxedSpan.textContent = "[MAX]";
         maxedSpan.style.color = COLOR_MAP.yellow;
-        btnRow.appendChild(maxedSpan);
+        row.appendChild(maxedSpan);
       } else {
         const costSpan = document.createElement("span");
-        costSpan.textContent = `     ${cost}💎`;
+        costSpan.textContent = `${cost}💎`;
         costSpan.style.color = canAfford ? COLOR_MAP.cyan : COLOR_MAP.gray;
-        btnRow.appendChild(costSpan);
+        row.appendChild(costSpan);
 
         const btn = document.createElement("span");
         btn.textContent = "[Buy]";
@@ -1564,9 +1573,13 @@ const UI = (() => {
           btn.dataset.action = "buyGemUpgrade";
           btn.dataset.upgradeId = upg.id;
         }
-        btnRow.appendChild(btn);
+        row.appendChild(btn);
       }
-      el.appendChild(btnRow);
+
+      el.appendChild(row);
+
+      // Hover tooltip 显示 desc
+      _bindGenericTooltip(row, upg.name, upg.desc, upg.icon);
     });
 
     // ── 一次性特殊解锁区 ─────────────────────────
@@ -1580,11 +1593,13 @@ const UI = (() => {
       const alreadyOwned = GemShop._getUnlockKey(unlock.id);
       const canAfford = gems >= unlock.cost && !alreadyOwned;
 
+      // 单行：icon + 名称 + 价格/OWNED + 按钮
       const row = document.createElement("div");
       row.style.display = "flex";
       row.style.alignItems = "baseline";
-      row.style.gap = "4px";
-      row.style.marginTop = "3px";
+      row.style.gap = "6px";
+      row.style.marginTop = "4px";
+      row.style.cursor = "default";
 
       const nameSpan = document.createElement("span");
       nameSpan.textContent = `  ${unlock.icon} ${unlock.name}`;
@@ -1592,31 +1607,16 @@ const UI = (() => {
       nameSpan.style.flex = "1";
       row.appendChild(nameSpan);
 
-      const descSpan = document.createElement("span");
-      descSpan.textContent = unlock.desc;
-      descSpan.style.color = COLOR_MAP.gray;
-      descSpan.style.fontSize = "0.82em";
-      row.appendChild(descSpan);
-
-      el.appendChild(row);
-
-      // 按钮行
-      const btnRow = document.createElement("div");
-      btnRow.style.marginLeft = "4px";
-      btnRow.style.display = "flex";
-      btnRow.style.gap = "6px";
-      btnRow.style.alignItems = "baseline";
-
       if (alreadyOwned) {
         const ownedSpan = document.createElement("span");
-        ownedSpan.textContent = "     [OWNED ✓]";
+        ownedSpan.textContent = "[OWNED ✓]";
         ownedSpan.style.color = COLOR_MAP.yellow;
-        btnRow.appendChild(ownedSpan);
+        row.appendChild(ownedSpan);
       } else {
         const costSpan = document.createElement("span");
-        costSpan.textContent = `     ${unlock.cost}💎`;
+        costSpan.textContent = `${unlock.cost}💎`;
         costSpan.style.color = canAfford ? COLOR_MAP.cyan : COLOR_MAP.gray;
-        btnRow.appendChild(costSpan);
+        row.appendChild(costSpan);
 
         const btn = document.createElement("span");
         btn.textContent = "[Buy]";
@@ -1625,9 +1625,13 @@ const UI = (() => {
           btn.dataset.action = "buyGemUnlock";
           btn.dataset.unlockId = unlock.id;
         }
-        btnRow.appendChild(btn);
+        row.appendChild(btn);
       }
-      el.appendChild(btnRow);
+
+      el.appendChild(row);
+
+      // Hover tooltip 显示 desc
+      _bindGenericTooltip(row, unlock.name, unlock.desc, unlock.icon);
     });
   }
 
