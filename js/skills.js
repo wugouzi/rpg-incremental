@@ -109,6 +109,206 @@ const Skills = (() => {
       cost: { gold: 800 },
     },
 
+    // ── 战士专精选择（Lv.15，互斥）──────────────
+    {
+      id: "spec_guardian",
+      name: "[Spec] Guardian",
+      class: "warrior",
+      type: "passive",
+      specGate: true,
+      specId: "guardian",
+      description: "Choose Guardian spec. Defensive powerhouse: shields, taunt, block, counter-attack.",
+      effect: { warriorSpec: "guardian" },
+      requires: "shield_wall",
+      unlockLevel: 15,
+      cost: { gold: 200 },
+    },
+    {
+      id: "spec_berserker",
+      name: "[Spec] Berserker",
+      class: "warrior",
+      type: "passive",
+      specGate: true,
+      specId: "berserker",
+      description: "Choose Berserker spec. Glass cannon: rage stacks, bloodthirst, berserk frenzy.",
+      effect: { warriorSpec: "berserker" },
+      requires: "power_strike",
+      unlockLevel: 15,
+      cost: { gold: 200 },
+    },
+
+    // ── 🛡️ Guardian 专精 ───────────────────────
+    {
+      id: "iron_fortress",
+      name: "Iron Fortress",
+      class: "warrior",
+      spec: "guardian",
+      type: "passive",
+      description: "+30% DEF; each hit received has 20% chance to grant a Block stack (max 3). Each Block stack reduces next hit by 15%.",
+      effect: { defMult: 1.3, blockChance: 0.20, blockMaxStacks: 3, blockDmgReduce: 0.15 },
+      requires: "spec_guardian",
+      unlockLevel: 15,
+      cost: { gold: 300 },
+    },
+    {
+      id: "shield_bash",
+      name: "Shield Bash",
+      class: "warrior",
+      spec: "guardian",
+      type: "active",
+      description: "Deal 120% ATK + stun monster for 2s (no monster attacks during stun). CD: 8s",
+      effect: { dmgMult: 1.2, stunDuration: 2000, cd: 8000, mpCost: 0 },
+      requires: "spec_guardian",
+      unlockLevel: 18,
+      cost: { gold: 400 },
+    },
+    {
+      id: "stalwart",
+      name: "Stalwart",
+      class: "warrior",
+      spec: "guardian",
+      type: "passive",
+      description: "+20% Max HP; damage taken reduced by 10% (flat)",
+      effect: { hpMult: 1.2, flatDmgReduce: 0.1 },
+      requires: "iron_fortress",
+      unlockLevel: 20,
+      cost: { gold: 500 },
+    },
+    {
+      id: "provoke",
+      name: "Provoke",
+      class: "warrior",
+      spec: "guardian",
+      type: "active",
+      description: "Taunt: for 5s, your attacks deal +40% DMG and you take +25% DMG (risk/reward). CD: 12s",
+      effect: { dmgMult: 1.0, provokeDuration: 5000, provokeAtkBonus: 0.4, provokeDmgTaken: 0.25, cd: 12000, mpCost: 0 },
+      requires: "shield_bash",
+      unlockLevel: 22,
+      cost: { gold: 600 },
+    },
+    {
+      id: "counter_stance",
+      name: "Counter Stance",
+      class: "warrior",
+      spec: "guardian",
+      type: "passive",
+      description: "After blocking an attack (Block stack consumed), next attack deals +60% DMG",
+      effect: { counterAfterBlock: true, counterDmgBonus: 0.6 },
+      requires: "stalwart",
+      unlockLevel: 25,
+      cost: { gold: 800 },
+    },
+    {
+      id: "fortress_mastery",
+      name: "Fortress Mastery",
+      class: "warrior",
+      spec: "guardian",
+      type: "passive",
+      description: "Block max stacks +2 (to 5); DEF also adds to ATK at 30% ratio; HP regen +2/s",
+      effect: { blockMaxBonus: 2, defToAtk: 0.3, hprAdd: 2 },
+      requires: "counter_stance",
+      unlockLevel: 30,
+      cost: { gold: 1500 },
+    },
+    {
+      id: "unbreakable",
+      name: "Unbreakable",
+      class: "warrior",
+      spec: "guardian",
+      type: "passive",
+      description: "When HP drops below 20%, gain Unbreakable for 5s: immune to death, all damage capped at 1",
+      effect: { unbreakable: true, unbreakableHpThresh: 0.2, unbreakableDuration: 5000 },
+      requires: "fortress_mastery",
+      unlockLevel: 35,
+      cost: { gold: 2500 },
+    },
+
+    // ── ⚔️ Berserker 专精 ──────────────────────
+    {
+      id: "bloodlust",
+      name: "Bloodlust",
+      class: "warrior",
+      spec: "berserker",
+      type: "passive",
+      description: "Each kill grants 1 Rage stack (max 10). Each stack gives +4% ATK. Stacks reset on death.",
+      effect: { rageOnKill: 1, rageMaxStacks: 10, rageAtkPerStack: 0.04 },
+      requires: "spec_berserker",
+      unlockLevel: 15,
+      cost: { gold: 300 },
+    },
+    {
+      id: "reckless_strike",
+      name: "Reckless Strike",
+      class: "warrior",
+      spec: "berserker",
+      type: "active",
+      description: "Deal 250% ATK damage but take 15% Max HP as self-damage. CD: 5s",
+      effect: { dmgMult: 2.5, selfDmgPct: 0.15, cd: 5000, mpCost: 0 },
+      requires: "spec_berserker",
+      unlockLevel: 18,
+      cost: { gold: 400 },
+    },
+    {
+      id: "war_cry",
+      name: "War Cry",
+      class: "warrior",
+      spec: "berserker",
+      type: "active",
+      description: "Enter Berserk for 8s: ATK +50%, SPD +0.5, but DEF -30%. CD: 20s",
+      effect: { berserkDuration: 8000, berserkAtkBonus: 0.5, berserkSpdBonus: 0.5, berserkDefPenalty: 0.3, cd: 20000, mpCost: 0 },
+      requires: "bloodlust",
+      unlockLevel: 22,
+      cost: { gold: 600 },
+    },
+    {
+      id: "blood_frenzy",
+      name: "Blood Frenzy",
+      class: "warrior",
+      spec: "berserker",
+      type: "passive",
+      description: "Every 5 Rage stacks: ATK speed +0.1; when at max Rage (10), crit rate +15%",
+      effect: { rageSpdPerFive: 0.1, maxRageCritBonus: 0.15 },
+      requires: "bloodlust",
+      unlockLevel: 20,
+      cost: { gold: 500 },
+    },
+    {
+      id: "execute",
+      name: "Execute",
+      class: "warrior",
+      spec: "berserker",
+      type: "active",
+      description: "If monster HP < 25%, deal 400% ATK (execute). Otherwise 180% ATK. CD: 10s",
+      effect: { executeDmgMult: 4.0, normalDmgMult: 1.8, executeThresh: 0.25, cd: 10000, mpCost: 0 },
+      requires: "reckless_strike",
+      unlockLevel: 25,
+      cost: { gold: 800 },
+    },
+    {
+      id: "berserker_mastery",
+      name: "Berserker Mastery",
+      class: "warrior",
+      spec: "berserker",
+      type: "passive",
+      description: "Rage stacks no longer reset on death (lose 3 instead); Reckless Strike self-damage heals you for 50% of damage dealt",
+      effect: { ragePersistOnDeath: true, rageDeathLoss: 3, recklessHeal: 0.5 },
+      requires: "execute",
+      unlockLevel: 30,
+      cost: { gold: 1500 },
+    },
+    {
+      id: "death_wish",
+      name: "Death Wish",
+      class: "warrior",
+      spec: "berserker",
+      type: "passive",
+      description: "Below 30% HP: ATK +40%, crit rate +20%. Reckless Strike deals +80% more when below 30% HP.",
+      effect: { deathWish: true, deathWishAtkBonus: 0.4, deathWishCritBonus: 0.2, deathWishHpThresh: 0.3, deathWishRecklessBonus: 0.8 },
+      requires: "berserker_mastery",
+      unlockLevel: 35,
+      cost: { gold: 2500 },
+    },
+
     // ── 法师通用基础（Lv10，专精前共享）────────
     {
       id: "arcane_boost",
@@ -659,6 +859,206 @@ const Skills = (() => {
       unlockLevel: 25,
       cost: { gold: 800 },
     },
+
+    // ── 游侠专精选择（Lv.15，互斥）──────────────
+    {
+      id: "spec_marksman",
+      name: "[Spec] Marksman",
+      class: "ranger",
+      type: "passive",
+      specGate: true,
+      specId: "marksman",
+      description: "Choose Marksman spec. Precision archer: focused shot, armor pierce, kill shot.",
+      effect: { rangerSpec: "marksman" },
+      requires: "eagle_eye",
+      unlockLevel: 15,
+      cost: { gold: 200 },
+    },
+    {
+      id: "spec_shadowblade",
+      name: "[Spec] Shadowblade",
+      class: "ranger",
+      type: "passive",
+      specGate: true,
+      specId: "shadowblade",
+      description: "Choose Shadowblade spec. Stealth assassin: backstab, poison, shadow clone.",
+      effect: { rangerSpec: "shadowblade" },
+      requires: "evasion",
+      unlockLevel: 15,
+      cost: { gold: 200 },
+    },
+
+    // ── 🎯 Marksman 专精 ─────────────────────
+    {
+      id: "focused_shot",
+      name: "Focused Shot",
+      class: "ranger",
+      spec: "marksman",
+      type: "active",
+      description: "Charge up: deal 300% ATK, ignores 40% DEF. CD: 7s",
+      effect: { dmgMult: 3.0, defBypass: 0.4, cd: 7000, mpCost: 0 },
+      requires: "spec_marksman",
+      unlockLevel: 15,
+      cost: { gold: 300 },
+    },
+    {
+      id: "armor_pierce",
+      name: "Armor Pierce",
+      class: "ranger",
+      spec: "marksman",
+      type: "passive",
+      description: "All attacks ignore 20% of monster DEF",
+      effect: { globalDefBypass: 0.2 },
+      requires: "spec_marksman",
+      unlockLevel: 18,
+      cost: { gold: 400 },
+    },
+    {
+      id: "snipe",
+      name: "Snipe",
+      class: "ranger",
+      spec: "marksman",
+      type: "active",
+      description: "Deal 200% ATK + guaranteed crit. CD: 10s",
+      effect: { dmgMult: 2.0, guaranteedCrit: true, cd: 10000, mpCost: 0 },
+      requires: "focused_shot",
+      unlockLevel: 22,
+      cost: { gold: 600 },
+    },
+    {
+      id: "piercing_shots",
+      name: "Piercing Shots",
+      class: "ranger",
+      spec: "marksman",
+      type: "passive",
+      description: "Crit hits also deal 30% bonus poison damage (ignores DEF)",
+      effect: { critPoisonBonus: 0.3 },
+      requires: "armor_pierce",
+      unlockLevel: 20,
+      cost: { gold: 500 },
+    },
+    {
+      id: "kill_shot",
+      name: "Kill Shot",
+      class: "ranger",
+      spec: "marksman",
+      type: "active",
+      description: "If monster HP < 30%, instant kill (deal 999% ATK). Otherwise 220% ATK. CD: 15s",
+      effect: { killShotDmg: 9.99, killShotNormalDmg: 2.2, killShotThresh: 0.3, cd: 15000, mpCost: 0 },
+      requires: "snipe",
+      unlockLevel: 25,
+      cost: { gold: 800 },
+    },
+    {
+      id: "marksman_mastery",
+      name: "Marksman Mastery",
+      class: "ranger",
+      spec: "marksman",
+      type: "passive",
+      description: "Every 5 consecutive crits: next attack deals 500% ATK (Ace Shot). Crit rate cap raised to 95%.",
+      effect: { aceShot: true, aceShotCount: 5, aceShotDmg: 5.0 },
+      requires: "kill_shot",
+      unlockLevel: 30,
+      cost: { gold: 1500 },
+    },
+    {
+      id: "deadeye",
+      name: "Dead Eye",
+      class: "ranger",
+      spec: "marksman",
+      type: "passive",
+      description: "+15% Crit Rate; crit damage multiplier +0.5x (total 3.5x with Lethal Strike); Focused Shot CD -2s",
+      effect: { critAdd: 0.15, critMult: 3.5, focusedShotCdReduce: 2000 },
+      requires: "marksman_mastery",
+      unlockLevel: 35,
+      cost: { gold: 2500 },
+    },
+
+    // ── 🗡️ Shadowblade 专精 ─────────────────────
+    {
+      id: "backstab",
+      name: "Backstab",
+      class: "ranger",
+      spec: "shadowblade",
+      type: "active",
+      description: "Deal 200% ATK. If monster is poisoned: deal 350% ATK instead. CD: 5s",
+      effect: { dmgMult: 2.0, backstabPoisonDmg: 3.5, cd: 5000, mpCost: 0 },
+      requires: "spec_shadowblade",
+      unlockLevel: 15,
+      cost: { gold: 300 },
+    },
+    {
+      id: "venom_blade",
+      name: "Venom Blade",
+      class: "ranger",
+      spec: "shadowblade",
+      type: "passive",
+      description: "Poison damage increased to 10% ATK/s; poison duration extended to 5s; can stack twice",
+      effect: { poisonPct: 0.1, poisonDuration: 5000, poisonStacks: 2 },
+      requires: "spec_shadowblade",
+      unlockLevel: 18,
+      cost: { gold: 400 },
+    },
+    {
+      id: "smoke_screen",
+      name: "Smoke Screen",
+      class: "ranger",
+      spec: "shadowblade",
+      type: "active",
+      description: "Dodge all attacks for 3s; next attack is guaranteed crit with +100% DMG. CD: 15s",
+      effect: { smokeScreenDuration: 3000, smokeScreenCritBonus: 1.0, cd: 15000, mpCost: 0 },
+      requires: "backstab",
+      unlockLevel: 22,
+      cost: { gold: 600 },
+    },
+    {
+      id: "shadow_mark",
+      name: "Shadow Mark",
+      class: "ranger",
+      spec: "shadowblade",
+      type: "passive",
+      description: "Dodging an attack increases next attack's DMG by 40% (stacks up to 3 times)",
+      effect: { shadowMarkOnDodge: true, shadowMarkDmgBonus: 0.4, shadowMarkMaxStacks: 3 },
+      requires: "venom_blade",
+      unlockLevel: 20,
+      cost: { gold: 500 },
+    },
+    {
+      id: "shadow_clone",
+      name: "Shadow Clone",
+      class: "ranger",
+      spec: "shadowblade",
+      type: "active",
+      description: "Summon a shadow clone for 6s that mimics 60% of your attacks. CD: 20s",
+      effect: { shadowCloneDuration: 6000, shadowCloneDmgRatio: 0.6, cd: 20000, mpCost: 0 },
+      requires: "smoke_screen",
+      unlockLevel: 25,
+      cost: { gold: 800 },
+    },
+    {
+      id: "shadowblade_mastery",
+      name: "Shadowblade Mastery",
+      class: "ranger",
+      spec: "shadowblade",
+      type: "passive",
+      description: "Poison DoT can crit; each crit refreshes poison duration; Backstab always crits when target is poisoned",
+      effect: { poisonCanCrit: true, critRefreshPoison: true, backstabAlwaysCrit: true },
+      requires: "shadow_clone",
+      unlockLevel: 30,
+      cost: { gold: 1500 },
+    },
+    {
+      id: "assassinate",
+      name: "Assassinate",
+      class: "ranger",
+      spec: "shadowblade",
+      type: "active",
+      description: "Instantly deal 600% ATK (ignores DEF), apply max poison stacks, +25% gold from kill. CD: 30s",
+      effect: { dmgMult: 6.0, defBypass: 1.0, applyMaxPoison: true, assassinateGoldBonus: 0.25, cd: 30000, mpCost: 0 },
+      requires: "shadowblade_mastery",
+      unlockLevel: 35,
+      cost: { gold: 2500 },
+    },
   ];
 
   const TEMPLATE_MAP = {};
@@ -694,13 +1094,14 @@ const Skills = (() => {
     }
     // 专精门控：只有选了对应专精才能看到/解锁
     if (tpl.spec) {
-      const currentSpec = state.mage ? state.mage.spec : null;
+      // 获取当前专精（支持法师/战士/游侠）
+      const currentSpec = _getCurrentSpec(state, tpl.class);
       if (!currentSpec) return { ok: false, reason: "Choose a spec first (Lv.15)" };
       if (currentSpec !== tpl.spec) return { ok: false, reason: `Requires ${tpl.spec} spec` };
     }
     // 专精门控技能：互斥检查（已选其他专精则不能再选）
     if (tpl.specGate) {
-      const currentSpec = state.mage ? state.mage.spec : null;
+      const currentSpec = _getCurrentSpec(state, tpl.class);
       if (currentSpec && currentSpec !== tpl.specId) {
         return { ok: false, reason: `Already chose ${currentSpec} spec` };
       }
@@ -710,6 +1111,16 @@ const Skills = (() => {
       return { ok: false, reason: `Need ${tpl.cost.gold}g` };
     }
     return { ok: true, reason: "" };
+  }
+
+  /**
+   * 获取当前职业的专精（供 canUnlock/getByClass 内部使用）
+   */
+  function _getCurrentSpec(state, cls) {
+    if (cls === "mage")    return state.mage    ? state.mage.spec    : null;
+    if (cls === "warrior") return state.warrior ? state.warrior.spec : null;
+    if (cls === "ranger")  return state.ranger  ? state.ranger.spec  : null;
+    return null;
   }
 
   function unlock(skillId) {
@@ -725,9 +1136,21 @@ const Skills = (() => {
 
     // 专精门控：写入 spec 选择
     if (tpl.specGate && tpl.specId) {
-      state.mage.spec = tpl.specId;
-      state.mage.specChosen = true;
-      if (window.UI) UI.addLog(`>> Element spec chosen: ${tpl.specId.toUpperCase()}!`, "yellow");
+      if (tpl.class === "mage") {
+        state.mage.spec = tpl.specId;
+        state.mage.specChosen = true;
+        if (window.UI) UI.addLog(`>> Element spec chosen: ${tpl.specId.toUpperCase()}!`, "yellow");
+      } else if (tpl.class === "warrior") {
+        if (!state.warrior) state.warrior = { spec: null, specChosen: false };
+        state.warrior.spec = tpl.specId;
+        state.warrior.specChosen = true;
+        if (window.UI) UI.addLog(`>> Warrior spec chosen: ${tpl.specId.toUpperCase()}!`, "yellow");
+      } else if (tpl.class === "ranger") {
+        if (!state.ranger) state.ranger = { spec: null, specChosen: false };
+        state.ranger.spec = tpl.specId;
+        state.ranger.specChosen = true;
+        if (window.UI) UI.addLog(`>> Ranger spec chosen: ${tpl.specId.toUpperCase()}!`, "yellow");
+      }
     }
 
     // thunder_god：应用 Ball Lightning CD 减少（永久效果，存入 TEMPLATE_MAP 覆盖）
@@ -888,12 +1311,14 @@ const Skills = (() => {
    */
   function getActiveSkills() {
     const state = State.get();
-    const spec = state.mage ? state.mage.spec : null;
     return SKILL_TEMPLATES.filter(t => {
       if (t.type !== "active") return false;
       if (!state.unlockedSkills[t.id]) return false;
       // 有专精标签的技能：只在匹配专精时生效
-      if (t.spec && t.spec !== spec) return false;
+      if (t.spec) {
+        const spec = _getCurrentSpec(state, t.class);
+        if (t.spec !== spec) return false;
+      }
       return true;
     });
   }
@@ -903,11 +1328,13 @@ const Skills = (() => {
    */
   function getPassiveSkills() {
     const state = State.get();
-    const spec = state.mage ? state.mage.spec : null;
     return SKILL_TEMPLATES.filter(t => {
       if (t.type !== "passive") return false;
       if (!state.unlockedSkills[t.id]) return false;
-      if (t.spec && t.spec !== spec) return false;
+      if (t.spec) {
+        const spec = _getCurrentSpec(state, t.class);
+        if (t.spec !== spec) return false;
+      }
       return true;
     });
   }
@@ -918,7 +1345,7 @@ const Skills = (() => {
    */
   function getByClass(className) {
     const state = State.get();
-    const currentSpec = state.mage ? state.mage.spec : null;
+    const currentSpec = _getCurrentSpec(state, className);
     return SKILL_TEMPLATES.filter(t => {
       if (t.class !== className && t.class !== "common") return false;
       // 专精技能：只显示当前专精的（或还未选时显示全部 specGate）

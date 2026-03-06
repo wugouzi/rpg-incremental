@@ -261,6 +261,14 @@ html, body {
   color: #1e2030;
 }
 
+.btn-gem {
+  color: #89dceb;
+}
+.btn-gem:hover {
+  background: #89dceb;
+  color: #1e2030;
+}
+
 /* 顶部按钮（header 内） */
 button.btn {
   font-size: 12px;

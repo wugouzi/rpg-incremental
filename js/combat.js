@@ -765,6 +765,9 @@ if (window.UI) {
       state.stats.eliteKills = (state.stats.eliteKills || 0) + 1;
     }
 
+    // 每日任务：击杀计数
+    if (window.DailyQuest) DailyQuest.onKill(monster.isElite || false);
+
     // Pyro：击杀时触发 Ignite Explosion
     if (state.mage && state.mage.spec === "pyro" && state.mage.burnStack > 0) {
       const stacks = state.mage.burnStack;
@@ -790,6 +793,8 @@ if (window.UI) {
     const goldGain = Utils.rand(monster.goldMin, monster.goldMax);
     state.hero.gold += goldGain;
     state.stats.totalGoldEarned += goldGain;
+    // 每日任务：金币统计
+    if (window.DailyQuest) DailyQuest.onGoldEarned(goldGain);
     UI.addLog(`>> ${monster.name} defeated! +${monster.expReward} exp, +${goldGain}g`, "yellow");
     if (window.UI) UI.markSidePanelDirty();
 
@@ -914,6 +919,9 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     const zone = Zones.getZone(state.currentZone);
     UI.addLog(`>> BOSS DEFEATED: ${state.currentMonster.name}!`, "yellow");
     Zones.onBossDefeated(state.currentZone);
+
+    // 每日任务：Boss 击杀
+    if (window.DailyQuest) DailyQuest.onBossKill();
 
     if (zone && zone.isFinal) {
       setTimeout(() => {

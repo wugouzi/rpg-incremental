@@ -60,6 +60,36 @@ const State = (() => {
       // 职业选择完成标记
       classChosen: false,
 
+      // 战士专精状态
+      warrior: {
+        spec: null,           // null | "guardian" | "berserker"（Lv.15 选择）
+        specChosen: false,
+        // ── Guardian ──
+        blockStacks: 0,       // 格挡层数（0~5）
+        provokeActive: false, // 挑衅激活中
+        provokeTimer: 0,      // 挑衅剩余时间（ms）
+        unbreakableActive: false, // 不屈状态
+        unbreakableTimer: 0,
+        // ── Berserker ──
+        rageStacks: 0,        // 怒气层数（0~10）
+        berserkActive: false, // 狂暴激活中
+        berserkTimer: 0,      // 狂暴剩余时间（ms）
+      },
+
+      // 游侠专精状态
+      ranger: {
+        spec: null,           // null | "marksman" | "shadowblade"（Lv.15 选择）
+        specChosen: false,
+        // ── Marksman ──
+        consecutiveCrits: 0,  // 连续暴击计数
+        // ── Shadowblade ──
+        shadowMarkStacks: 0,  // 暗影印记层数（0~3）
+        smokeScreenActive: false, // 烟幕激活中
+        smokeScreenTimer: 0,
+        shadowCloneActive: false, // 影分身激活中
+        shadowCloneTimer: 0,
+      },
+
       // 法师专精状态
       mage: {
         spec: null,           // null | "pyro" | "cryo" | "storm"（Lv.15 选择）

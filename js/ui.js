@@ -43,6 +43,8 @@ const UI = (() => {
         Combat.stopRest();
       } else {
         Combat.startRest();
+        // 每日任务：使用 REST
+        if (window.DailyQuest) DailyQuest.onRest();
       }
     });
     document.getElementById("btn-boss").addEventListener("click", () => Combat.challengeBoss());
@@ -54,7 +56,7 @@ const UI = (() => {
     });
 
     // 标签栏
-    ["stats", "inventory", "shop", "skills", "zones"].forEach(tab => {
+    ["stats", "inventory", "shop", "skills", "zones", "quests"].forEach(tab => {
       document.getElementById(`tab-${tab}`).addEventListener("click", () => switchTab(tab));
     });
 
@@ -398,7 +400,7 @@ const UI = (() => {
   function switchTab(tabName) {
     activeTab = tabName;
     // 更新标签栏选中样式
-    ["stats", "inventory", "shop", "skills", "zones"].forEach(t => {
+    ["stats", "inventory", "shop", "skills", "zones", "quests"].forEach(t => {
       const el = document.getElementById(`tab-${t}`);
       if (el) el.classList.toggle("active", t === tabName);
     });
@@ -413,6 +415,7 @@ const UI = (() => {
       case "shop":      renderShop();      break;
       case "skills":    renderSkills();    break;
       case "zones":     renderZones();     break;
+      case "quests":    renderQuests();    break;
     }
   }
 
@@ -1290,6 +1293,9 @@ const UI = (() => {
 
     // 黑市区域
     _renderBlackMarket(el, state);
+
+    // 宝石商店区域
+    _renderGemShop(el, state);
   }
 
   // ─────────────────────────────────────────
@@ -1375,6 +1381,152 @@ const UI = (() => {
   }
 
   // ─────────────────────────────────────────
+  // 宝石商店 UI（嵌入在 Shop 面板底部）
+  // ─────────────────────────────────────────
+
+  function _renderGemShop(el, state) {
+    if (!window.GemShop) return;
+
+    const gems = state.hero.gems || 0;
+
+    const header = document.createElement("div");
+    header.style.color = COLOR_MAP.cyan;
+    header.style.marginTop = "14px";
+    header.textContent = `  ── 💎 GEM SHOP (Gems: ${gems}) ────────────────`;
+    el.appendChild(header);
+
+    const hint = document.createElement("div");
+    hint.textContent = "  Permanent upgrades bought with Gems (earned from Prestige)";
+    hint.style.color = COLOR_MAP.gray;
+    hint.style.fontSize = "0.85em";
+    el.appendChild(hint);
+
+    // ── 永久升级区 ──────────────────────────────
+    const upgHeader = document.createElement("div");
+    upgHeader.textContent = "  ── PERMANENT UPGRADES ──────────────────";
+    upgHeader.style.color = COLOR_MAP.white;
+    upgHeader.style.marginTop = "6px";
+    el.appendChild(upgHeader);
+
+    GemShop.UPGRADES.forEach(upg => {
+      const lvl = GemShop.getUpgradeLevel(upg.id);
+      const cost = GemShop.getUpgradeCost(upg);
+      const maxed = lvl >= upg.maxLevel;
+      const canAfford = gems >= cost && !maxed;
+
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "baseline";
+      row.style.gap = "4px";
+      row.style.marginTop = "3px";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.textContent = `  ${upg.icon} ${upg.name} (${lvl}/${upg.maxLevel})`;
+      nameSpan.style.color = maxed ? COLOR_MAP.yellow : COLOR_MAP.white;
+      nameSpan.style.flex = "1";
+      row.appendChild(nameSpan);
+
+      const descSpan = document.createElement("span");
+      descSpan.textContent = upg.desc;
+      descSpan.style.color = COLOR_MAP.gray;
+      descSpan.style.fontSize = "0.82em";
+      row.appendChild(descSpan);
+
+      el.appendChild(row);
+
+      // 按钮行
+      const btnRow = document.createElement("div");
+      btnRow.style.marginLeft = "4px";
+      btnRow.style.display = "flex";
+      btnRow.style.gap = "6px";
+      btnRow.style.alignItems = "baseline";
+
+      if (maxed) {
+        const maxedSpan = document.createElement("span");
+        maxedSpan.textContent = "     [MAX]";
+        maxedSpan.style.color = COLOR_MAP.yellow;
+        btnRow.appendChild(maxedSpan);
+      } else {
+        const costSpan = document.createElement("span");
+        costSpan.textContent = `     ${cost}💎`;
+        costSpan.style.color = canAfford ? COLOR_MAP.cyan : COLOR_MAP.gray;
+        btnRow.appendChild(costSpan);
+
+        const btn = document.createElement("span");
+        btn.textContent = "[Buy]";
+        btn.className = canAfford ? "btn btn-gem" : "btn btn-disabled";
+        if (canAfford) {
+          btn.dataset.action = "buyGemUpgrade";
+          btn.dataset.upgradeId = upg.id;
+        }
+        btnRow.appendChild(btn);
+      }
+      el.appendChild(btnRow);
+    });
+
+    // ── 一次性特殊解锁区 ─────────────────────────
+    const unlockHeader = document.createElement("div");
+    unlockHeader.textContent = "  ── SPECIAL UNLOCKS ─────────────────────";
+    unlockHeader.style.color = COLOR_MAP.white;
+    unlockHeader.style.marginTop = "8px";
+    el.appendChild(unlockHeader);
+
+    GemShop.SPECIAL_UNLOCKS.forEach(unlock => {
+      const alreadyOwned = GemShop._getUnlockKey(unlock.id);
+      const canAfford = gems >= unlock.cost && !alreadyOwned;
+
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "baseline";
+      row.style.gap = "4px";
+      row.style.marginTop = "3px";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.textContent = `  ${unlock.icon} ${unlock.name}`;
+      nameSpan.style.color = alreadyOwned ? COLOR_MAP.yellow : COLOR_MAP.white;
+      nameSpan.style.flex = "1";
+      row.appendChild(nameSpan);
+
+      const descSpan = document.createElement("span");
+      descSpan.textContent = unlock.desc;
+      descSpan.style.color = COLOR_MAP.gray;
+      descSpan.style.fontSize = "0.82em";
+      row.appendChild(descSpan);
+
+      el.appendChild(row);
+
+      // 按钮行
+      const btnRow = document.createElement("div");
+      btnRow.style.marginLeft = "4px";
+      btnRow.style.display = "flex";
+      btnRow.style.gap = "6px";
+      btnRow.style.alignItems = "baseline";
+
+      if (alreadyOwned) {
+        const ownedSpan = document.createElement("span");
+        ownedSpan.textContent = "     [OWNED ✓]";
+        ownedSpan.style.color = COLOR_MAP.yellow;
+        btnRow.appendChild(ownedSpan);
+      } else {
+        const costSpan = document.createElement("span");
+        costSpan.textContent = `     ${unlock.cost}💎`;
+        costSpan.style.color = canAfford ? COLOR_MAP.cyan : COLOR_MAP.gray;
+        btnRow.appendChild(costSpan);
+
+        const btn = document.createElement("span");
+        btn.textContent = "[Buy]";
+        btn.className = canAfford ? "btn btn-gem" : "btn btn-disabled";
+        if (canAfford) {
+          btn.dataset.action = "buyGemUnlock";
+          btn.dataset.unlockId = unlock.id;
+        }
+        btnRow.appendChild(btn);
+      }
+      el.appendChild(btnRow);
+    });
+  }
+
+  // ─────────────────────────────────────────
   // Skills 面板
   // ─────────────────────────────────────────
 
@@ -1419,6 +1571,116 @@ const UI = (() => {
         });
       }
       el.appendChild(document.createElement("br"));
+    }
+
+    // ── 战士专精选择 UI ────────────────────────
+    if (state.hero.class === "warrior" && state.classChosen && state.warrior && !state.warrior.specChosen) {
+      const specHeader = document.createElement("div");
+      specHeader.textContent = state.hero.level >= 15
+        ? "  ── CHOOSE WARRIOR SPEC (Lv.15) ──────────"
+        : `  ── Reach Lv.15 to choose Warrior Spec (Current: Lv.${state.hero.level}) ──`;
+      specHeader.style.color = COLOR_MAP.yellow;
+      el.appendChild(specHeader);
+
+      if (state.hero.level >= 15) {
+        const specOptions = [
+          { id: "spec_guardian",   label: "GUARDIAN",   icon: "🛡️", desc: "Defensive powerhouse: block stacks, taunt, counter-attack, unbreakable." },
+          { id: "spec_berserker",  label: "BERSERKER",  icon: "⚔️", desc: "Glass cannon: rage stacks, berserk frenzy, execute at low HP." },
+        ];
+        specOptions.forEach(opt => {
+          const check = Skills.canUnlock(opt.id);
+          const row = document.createElement("div");
+          row.style.marginBottom = "6px";
+
+          const btn = document.createElement("span");
+          btn.textContent = `  [Choose ${opt.label}]`;
+          btn.className = check.ok ? "btn" : "btn btn-disabled";
+          if (check.ok) {
+            btn.dataset.action = "learnSkill";
+            btn.dataset.skillId = opt.id;
+          }
+          row.appendChild(btn);
+
+          const descSpan = document.createElement("span");
+          descSpan.textContent = ` ${opt.icon} ${opt.desc}`;
+          descSpan.style.color = COLOR_MAP.gray;
+          row.appendChild(descSpan);
+
+          if (!check.ok && check.reason !== "Already learned") {
+            const reasonSpan = document.createElement("span");
+            reasonSpan.textContent = ` [${check.reason}]`;
+            reasonSpan.style.color = COLOR_MAP.red;
+            row.appendChild(reasonSpan);
+          }
+
+          el.appendChild(row);
+        });
+      }
+      el.appendChild(document.createElement("br"));
+    }
+
+    // 战士专精标签显示
+    if (state.warrior && state.warrior.spec) {
+      const specNames = { guardian: "🛡️ GUARDIAN", berserker: "⚔️ BERSERKER" };
+      const specLabel = document.createElement("div");
+      specLabel.textContent = `  ── SPEC: ${specNames[state.warrior.spec] || state.warrior.spec.toUpperCase()} ──────────────────`;
+      specLabel.style.color = COLOR_MAP.yellow;
+      el.appendChild(specLabel);
+    }
+
+    // ── 游侠专精选择 UI ────────────────────────
+    if (state.hero.class === "ranger" && state.classChosen && state.ranger && !state.ranger.specChosen) {
+      const specHeader = document.createElement("div");
+      specHeader.textContent = state.hero.level >= 15
+        ? "  ── CHOOSE RANGER SPEC (Lv.15) ───────────"
+        : `  ── Reach Lv.15 to choose Ranger Spec (Current: Lv.${state.hero.level}) ──`;
+      specHeader.style.color = COLOR_MAP.yellow;
+      el.appendChild(specHeader);
+
+      if (state.hero.level >= 15) {
+        const specOptions = [
+          { id: "spec_marksman",    label: "MARKSMAN",    icon: "🎯", desc: "Precision archer: focused shot, armor pierce, ace shot, kill shot." },
+          { id: "spec_shadowblade", label: "SHADOWBLADE", icon: "🗡️", desc: "Stealth assassin: backstab, poison synergy, shadow clone, assassinate." },
+        ];
+        specOptions.forEach(opt => {
+          const check = Skills.canUnlock(opt.id);
+          const row = document.createElement("div");
+          row.style.marginBottom = "6px";
+
+          const btn = document.createElement("span");
+          btn.textContent = `  [Choose ${opt.label}]`;
+          btn.className = check.ok ? "btn" : "btn btn-disabled";
+          if (check.ok) {
+            btn.dataset.action = "learnSkill";
+            btn.dataset.skillId = opt.id;
+          }
+          row.appendChild(btn);
+
+          const descSpan = document.createElement("span");
+          descSpan.textContent = ` ${opt.icon} ${opt.desc}`;
+          descSpan.style.color = COLOR_MAP.gray;
+          row.appendChild(descSpan);
+
+          if (!check.ok && check.reason !== "Already learned") {
+            const reasonSpan = document.createElement("span");
+            reasonSpan.textContent = ` [${check.reason}]`;
+            reasonSpan.style.color = COLOR_MAP.red;
+            row.appendChild(reasonSpan);
+          }
+
+          el.appendChild(row);
+        });
+      }
+      el.appendChild(document.createElement("br"));
+    }
+
+    // 游侠专精标签显示
+    if (state.ranger && state.ranger.spec) {
+      const specNames = { marksman: "🎯 MARKSMAN", shadowblade: "🗡️ SHADOWBLADE" };
+      const specLabel = document.createElement("div");
+      specLabel.textContent = `  ── SPEC: ${specNames[state.ranger.spec] || state.ranger.spec.toUpperCase()} ──────────────────`;
+      specLabel.style.color = COLOR_MAP.yellow;
+      el.appendChild(specLabel);
     }
 
     // ── 法师元素专精选择 UI ────────────────────
@@ -1604,6 +1866,52 @@ const UI = (() => {
         return;
       }
 
+      // ── 战士：内部分为 Base / Spec-Gate / 各专精 子组 ──
+      if (g.class === "warrior") {
+        const currentSpec = state.warrior && state.warrior.spec;
+        const specLabels = { guardian: "🛡️ GUARDIAN", berserker: "⚔️ BERSERKER" };
+
+        const baseSkills = skillsInGroup.filter(s => !s.spec && !s.specGate);
+        _renderSubGroup(el, "warrior_base", "BASE SKILLS", baseSkills);
+
+        const specGateSkills = skillsInGroup.filter(s => s.specGate);
+        _renderSubGroup(el, "warrior_spec_gate", "── CHOOSE SPEC ──", specGateSkills);
+
+        ["guardian", "berserker"].forEach(specId => {
+          const specSkills = skillsInGroup.filter(s => s.spec === specId);
+          if (specSkills.length === 0) return;
+          const subKey = `warrior_${specId}`;
+          const subLabel = specLabels[specId] || specId.toUpperCase();
+          _renderSubGroup(el, subKey, subLabel, specSkills);
+        });
+
+        el.appendChild(document.createElement("br"));
+        return;
+      }
+
+      // ── 游侠：内部分为 Base / Spec-Gate / 各专精 子组 ──
+      if (g.class === "ranger") {
+        const currentSpec = state.ranger && state.ranger.spec;
+        const specLabels = { marksman: "🎯 MARKSMAN", shadowblade: "🗡️ SHADOWBLADE" };
+
+        const baseSkills = skillsInGroup.filter(s => !s.spec && !s.specGate);
+        _renderSubGroup(el, "ranger_base", "BASE SKILLS", baseSkills);
+
+        const specGateSkills = skillsInGroup.filter(s => s.specGate);
+        _renderSubGroup(el, "ranger_spec_gate", "── CHOOSE SPEC ──", specGateSkills);
+
+        ["marksman", "shadowblade"].forEach(specId => {
+          const specSkills = skillsInGroup.filter(s => s.spec === specId);
+          if (specSkills.length === 0) return;
+          const subKey = `ranger_${specId}`;
+          const subLabel = specLabels[specId] || specId.toUpperCase();
+          _renderSubGroup(el, subKey, subLabel, specSkills);
+        });
+
+        el.appendChild(document.createElement("br"));
+        return;
+      }
+
       // 其他职业：扁平列表
       skillsInGroup.forEach(skill => el.appendChild(_renderSkillRow(skill, "  ")));
       el.appendChild(document.createElement("br"));
@@ -1709,6 +2017,133 @@ const UI = (() => {
   }
 
   // ─────────────────────────────────────────
+  // Quests 面板
+  // ─────────────────────────────────────────
+
+  function renderQuests() {
+    const el = document.getElementById("side-panel");
+    el.innerHTML = "";
+
+    const header = document.createElement("div");
+    header.textContent = "  ── 📋 DAILY QUESTS ─────────────────────";
+    header.style.color = COLOR_MAP.white;
+    el.appendChild(header);
+
+    if (!window.DailyQuest) {
+      const nomod = document.createElement("div");
+      nomod.textContent = "  (Daily quest system not loaded)";
+      nomod.style.color = COLOR_MAP.gray;
+      el.appendChild(nomod);
+      return;
+    }
+
+    DailyQuest.init();
+    const quests = DailyQuest.getQuests();
+    const progress = DailyQuest.getProgress();
+    const stats = DailyQuest.getSessionStats();
+    const today = DailyQuest._todayStr();
+
+    // 日期 + 进度摘要
+    const dateLine = document.createElement("div");
+    dateLine.textContent = `  Date: ${today}  Progress: ${progress.completed}/${progress.total} completed`;
+    dateLine.style.color = COLOR_MAP.gray;
+    el.appendChild(dateLine);
+
+    el.appendChild(document.createElement("br"));
+
+    // 任务列表
+    quests.forEach((quest, idx) => {
+      const row = document.createElement("div");
+      row.style.marginBottom = "8px";
+      row.style.borderLeft = quest.completed
+        ? `2px solid ${COLOR_MAP.green}`
+        : `2px solid ${COLOR_MAP.gray}`;
+      row.style.paddingLeft = "6px";
+
+      // 任务名称 + 状态
+      const titleLine = document.createElement("div");
+      const titleSpan = document.createElement("span");
+      titleSpan.textContent = quest.completed ? `✓ ${quest.name}` : `▸ ${quest.name}`;
+      titleSpan.style.color = quest.completed ? COLOR_MAP.green : COLOR_MAP.white;
+      titleSpan.style.fontWeight = quest.completed ? "bold" : "";
+      titleLine.appendChild(titleSpan);
+
+      if (quest.rewarded) {
+        const rewardedTag = document.createElement("span");
+        rewardedTag.textContent = "  [CLAIMED]";
+        rewardedTag.style.color = COLOR_MAP.yellow;
+        rewardedTag.style.fontSize = "0.85em";
+        titleLine.appendChild(rewardedTag);
+      }
+      row.appendChild(titleLine);
+
+      // 任务描述
+      const descLine = document.createElement("div");
+      descLine.textContent = `  ${quest.desc}`;
+      descLine.style.color = COLOR_MAP.gray;
+      descLine.style.fontSize = "0.88em";
+      row.appendChild(descLine);
+
+      // 进度条
+      if (quest.type !== "login") {
+        const pct = Math.min(quest.progress / quest.target, 1);
+        const BAR_LEN = 12;
+        const filled = Math.round(pct * BAR_LEN);
+        const bar = "[" + "█".repeat(filled) + "░".repeat(BAR_LEN - filled) + "]";
+        const progressLine = document.createElement("div");
+        progressLine.textContent = `  ${bar} ${quest.progress}/${quest.target}`;
+        progressLine.style.color = quest.completed ? COLOR_MAP.green : COLOR_MAP.cyan;
+        row.appendChild(progressLine);
+      }
+
+      // 奖励显示
+      const rewardParts = [];
+      if (quest.reward.gold > 0) rewardParts.push(`${quest.reward.gold}g`);
+      if (quest.reward.gems > 0) rewardParts.push(`${quest.reward.gems}💎`);
+      if (rewardParts.length > 0) {
+        const rewardLine = document.createElement("div");
+        rewardLine.textContent = `  Reward: ${rewardParts.join(" + ")}`;
+        rewardLine.style.color = quest.rewarded ? COLOR_MAP.gray : COLOR_MAP.yellow;
+        rewardLine.style.fontSize = "0.85em";
+        row.appendChild(rewardLine);
+      }
+
+      el.appendChild(row);
+    });
+
+    // 今日会话统计
+    el.appendChild(document.createElement("br"));
+    const statsHeader = document.createElement("div");
+    statsHeader.textContent = "  ── TODAY'S STATS ───────────────────────";
+    statsHeader.style.color = COLOR_MAP.white;
+    el.appendChild(statsHeader);
+
+    const statsLines = [
+      { label: "Kills",       val: Utils.formatNum(stats.kills) },
+      { label: "Elite Kills", val: Utils.formatNum(stats.eliteKills) },
+      { label: "Damage",      val: Utils.formatNum(stats.damage) },
+      { label: "Gold Earned", val: Utils.formatNum(stats.goldEarned) + "g" },
+      { label: "Boss Kills",  val: stats.bossKills },
+      { label: "Rests",       val: stats.rests },
+    ];
+
+    statsLines.forEach(s => {
+      const line = document.createElement("div");
+      line.textContent = `  ${s.label.padEnd(12)}: ${s.val}`;
+      line.style.color = COLOR_MAP.gray;
+      el.appendChild(line);
+    });
+
+    // 提示：每日重置
+    el.appendChild(document.createElement("br"));
+    const hint = document.createElement("div");
+    hint.textContent = "  ℹ Quests reset daily. Login quest auto-completes.";
+    hint.style.color = COLOR_MAP.gray;
+    hint.style.fontSize = "0.82em";
+    el.appendChild(hint);
+  }
+
+  // ─────────────────────────────────────────
   // 侧面板事件委托
   // ─────────────────────────────────────────
 
@@ -1793,6 +2228,14 @@ const UI = (() => {
       }
       case "buyBlackMarket": {
         BlackMarket.buy(parseInt(target.dataset.bmIdx, 10));
+        break;
+      }
+      case "buyGemUpgrade": {
+        if (window.GemShop) GemShop.buyUpgrade(target.dataset.upgradeId);
+        break;
+      }
+      case "buyGemUnlock": {
+        if (window.GemShop) GemShop.buySpecialUnlock(target.dataset.unlockId);
         break;
       }
     }

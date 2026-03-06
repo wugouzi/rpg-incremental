@@ -75,6 +75,8 @@ const gameModules = [
   "../js/prestige.js",
   "../js/save.js",
   "../js/blackmarket.js",
+  "../js/gemshop.js",
+  "../js/dailyquest.js",
 ];
 
 gameModules.forEach(rel => {
@@ -106,6 +108,9 @@ const testFiles = [
   "test-new-features.js",
   "test-money-sink.js",
   "test-achievements.js",
+  "test-warrior-ranger-spec.js",
+  "test-gemshop.js",
+  "test-dailyquest.js",
 ];
 
 console.log(gr("Running tests...\n"));
