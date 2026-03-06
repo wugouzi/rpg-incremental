@@ -1,0 +1,446 @@
+/* style.css — 仿终端风格：深蓝灰底，浅亮色字，等宽字体，ASCII 线框 */
+
+/*
+  配色方案：Catppuccin Mocha 风格
+  背景     #1e2030  深蓝灰
+  面板背景  #24273a  稍亮的蓝灰
+  边框     #363a4f  蓝灰边框
+  主文字   #cad3f5  浅蓝白（主内容）
+  次要文字  #6e738d  蓝灰（弱化信息）
+  强调绿   #a6e3a1  柔和薄荷绿（正面/增益）
+  强调红   #f38ba8  柔和玫瑰红（伤害/警告）
+  强调黄   #f9e2af  暖奶黄（金币/掉落）
+  强调青   #89dceb  天空蓝（技能/魔法）
+  强调橙   #fab387  桃橙（停止/警示）
+  强调紫   #cba6f7  薰衣草紫（BOSS/精英）
+  白色     #ffffff  标题
+*/
+
+/* ── 基础重置 ─────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: #1e2030;
+  color: #cad3f5;
+  font-family: 'Courier New', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ── 全局布局 ─────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-left: 1px solid #363a4f;
+  border-right: 1px solid #363a4f;
+}
+
+/* ── 顶部标题栏 ───────────────────────────── */
+#header {
+  flex-shrink: 0;
+  border-bottom: 1px solid #494d64;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #181926;
+}
+
+#header .game-title {
+  color: #cba6f7;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  flex: 1;
+}
+
+#header .header-divider {
+  color: #363a4f;
+}
+
+/* ── 主内容区（三栏） ─────────────────────── */
+#main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── 左侧角色面板 ─────────────────────────── */
+#hero-panel {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid #363a4f;
+  padding: 8px 4px;
+  overflow-y: auto;
+  white-space: pre;
+  color: #cad3f5;
+  font-size: 12px;
+  line-height: 1.6;
+  background: #1e2030;
+}
+
+/* ── 中间战斗区域 ─────────────────────────── */
+#combat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #363a4f;
+  min-width: 0;
+  background: #1e2030;
+}
+
+#combat-status {
+  flex-shrink: 0;
+  padding: 8px 4px;
+  white-space: pre;
+  color: #cad3f5;
+  font-size: 12px;
+  line-height: 1.6;
+  border-bottom: 1px solid #2d3045;
+}
+
+#combat-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #2d3045;
+  flex-wrap: wrap;
+}
+
+#combat-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  min-height: 0;
+  /* 自定义滚动条 */
+  scrollbar-width: thin;
+  scrollbar-color: #363a4f #1e2030;
+}
+
+#combat-log::-webkit-scrollbar {
+  width: 4px;
+}
+#combat-log::-webkit-scrollbar-track {
+  background: #1e2030;
+}
+#combat-log::-webkit-scrollbar-thumb {
+  background: #494d64;
+}
+
+/* ── 右侧功能面板 ─────────────────────────── */
+#right-column {
+  width: 380px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #1e2030;
+}
+
+#tab-bar {
+  flex-shrink: 0;
+  display: flex;
+  border-bottom: 1px solid #363a4f;
+  background: #181926;
+}
+
+#tab-bar .tab {
+  flex: 1;
+  text-align: center;
+  padding: 5px 2px;
+  cursor: pointer;
+  color: #6e738d;
+  font-size: 12px;
+  border-right: 1px solid #2d3045;
+  letter-spacing: 1px;
+  transition: background 0.1s, color 0.1s;
+}
+
+#tab-bar .tab:last-child {
+  border-right: none;
+}
+
+#tab-bar .tab:hover {
+  background: #2d3045;
+  color: #cad3f5;
+}
+
+#tab-bar .tab.active {
+  background: #494d64;
+  color: #cba6f7;
+  font-weight: bold;
+}
+
+#side-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #cad3f5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  scrollbar-width: thin;
+  scrollbar-color: #363a4f #1e2030;
+}
+
+#side-panel::-webkit-scrollbar {
+  width: 4px;
+}
+#side-panel::-webkit-scrollbar-track {
+  background: #1e2030;
+}
+#side-panel::-webkit-scrollbar-thumb {
+  background: #494d64;
+}
+
+/* ── 底部标签行 ───────────────────────────── */
+#footer {
+  flex-shrink: 0;
+  border-top: 1px solid #363a4f;
+  padding: 3px 8px;
+  color: #494d64;
+  font-size: 11px;
+  display: flex;
+  gap: 16px;
+  background: #181926;
+}
+
+/* ── 按钮样式 ─────────────────────────────── */
+.btn {
+  cursor: pointer;
+  color: #a6e3a1;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 1px 3px;
+  display: inline-block;
+  transition: background 0.08s, color 0.08s;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: #a6e3a1;
+  color: #1e2030;
+}
+
+.btn-disabled {
+  cursor: not-allowed;
+  color: #494d64;
+  pointer-events: none;
+}
+
+.btn-sell {
+  color: #f9e2af;
+}
+.btn-sell:hover {
+  background: #f9e2af;
+  color: #1e2030;
+}
+
+.btn-boss {
+  color: #f38ba8;
+}
+.btn-boss:hover {
+  background: #f38ba8;
+  color: #1e2030;
+}
+
+/* 顶部按钮（header 内） */
+button.btn {
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border: 1px solid #a6e3a1;
+  color: #a6e3a1;
+}
+
+button.btn:hover {
+  background: #a6e3a1;
+  color: #1e2030;
+}
+
+button#btn-prestige {
+  border-color: #f9e2af;
+  color: #f9e2af;
+}
+button#btn-prestige:hover {
+  background: #f9e2af;
+  color: #1e2030;
+}
+
+button#btn-reset {
+  border-color: #f38ba8;
+  color: #f38ba8;
+}
+button#btn-reset:hover {
+  background: #f38ba8;
+  color: #1e2030;
+}
+
+/* ── 战斗操作按钮 ─────────────────────────── */
+#btn-attack {
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  padding: 4px 16px;
+  border: 1px solid #a6e3a1;
+  color: #a6e3a1;
+}
+
+#btn-attack:hover {
+  background: #a6e3a1;
+  color: #1e2030;
+}
+
+#btn-auto {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid #6e738d;
+  color: #6e738d;
+}
+
+#btn-auto:hover {
+  background: #6e738d;
+  color: #1e2030;
+}
+
+#btn-stop {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid #fab387;
+  color: #fab387;
+}
+
+#btn-stop:hover {
+  background: #fab387;
+  color: #1e2030;
+}
+
+#btn-boss {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid #f38ba8;
+  color: #f38ba8;
+}
+
+#btn-boss:hover {
+  background: #f38ba8;
+  color: #1e2030;
+}
+
+/* REST 按钮 */
+#btn-rest {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid #89dceb;
+  color: #89dceb;
+}
+#btn-rest:hover {
+  background: #89dceb;
+  color: #1e2030;
+}
+#btn-rest:disabled {
+  border-color: #363a4f;
+  color: #363a4f;
+  cursor: not-allowed;
+}
+
+/* ── 日志过滤栏 ───────────────────────────── */
+#log-filter-bar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  padding: 3px 8px;
+  border-bottom: 1px solid #2d3045;
+  background: #181926;
+}
+
+.log-filter {
+  cursor: pointer;
+  color: #6e738d;
+  font-size: 11px;
+  padding: 1px 4px;
+  letter-spacing: 0.5px;
+  transition: color 0.1s, background 0.1s;
+}
+
+.log-filter:hover {
+  color: #cad3f5;
+}
+
+.log-filter.active {
+  color: #89dceb;
+  font-weight: bold;
+}
+
+/* ── 分隔线 ───────────────────────────────── */
+.divider {
+  border: none;
+  border-top: 1px solid #2d3045;
+  margin: 4px 0;
+}
+
+/* ── 颜色工具类 ───────────────────────────── */
+.c-green  { color: #a6e3a1; }
+.c-red    { color: #f38ba8; }
+.c-yellow { color: #f9e2af; }
+.c-cyan   { color: #89dceb; }
+.c-white  { color: #cad3f5; }
+.c-gray   { color: #6e738d; }
+
+/* ── 闪烁光标 ─────────────────────────────── */
+@keyframes blink {
+  0%, 49%  { opacity: 1; }
+  50%, 100%{ opacity: 0; }
+}
+
+.cursor {
+  display: inline-block;
+  animation: blink 1s step-start infinite;
+  color: #89dceb;
+}
+
+/* ── 选中文字样式 ─────────────────────────── */
+::selection {
+  background: #494d64;
+  color: #cad3f5;
+}
+
+/* ── 响应式：小屏幕 ────────────────────────── */
+@media (max-width: 900px) {
+  html, body { font-size: 11px; }
+  #hero-panel { width: 180px; }
+  #right-column { width: 280px; }
+}
+
+@media (max-width: 640px) {
+  #main-content { flex-direction: column; }
+  #hero-panel {
+    width: 100%;
+    height: 120px;
+    border-right: none;
+    border-bottom: 1px solid #363a4f;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  #right-column {
+    width: 100%;
+    height: 220px;
+  }
+}

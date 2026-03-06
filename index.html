@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IDLE HERO</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── 顶部标题栏 ──────────────────────────── -->
+  <div id="header">
+    <span class="game-title">▶ IDLE HERO</span>
+    <button class="btn" id="btn-save">[Save]</button>
+    <button class="btn" id="btn-load">[Load]</button>
+    <button class="btn" id="btn-prestige">[Prestige]</button>
+    <button class="btn" id="btn-reset">[Reset]</button>
+  </div>
+
+  <!-- ── 主内容（三栏布局） ──────────────────── -->
+  <div id="main-content">
+
+    <!-- 左：角色面板 -->
+    <pre id="hero-panel">  Loading...</pre>
+
+    <!-- 中：战斗区域 -->
+    <div id="combat-area">
+      <pre id="combat-status">  Loading...</pre>
+
+      <div id="combat-actions">
+        <button class="btn" id="btn-attack">[ATTACK]</button>
+        <button class="btn" id="btn-auto">[AUTO: OFF]</button>
+        <button class="btn btn-stop" id="btn-stop">[STOP]</button>
+        <button class="btn" id="btn-rest">[REST]</button>
+        <button class="btn" id="btn-boss">[Challenge Boss]</button>
+      </div>
+
+      <!-- 日志过滤栏 -->
+      <div id="log-filter-bar">
+        <span class="log-filter active" data-filter="all">[ALL]</span>
+        <span class="log-filter" data-filter="combat">[COMBAT]</span>
+        <span class="log-filter" data-filter="loot">[LOOT]</span>
+      </div>
+
+      <!-- 战斗日志滚动区 -->
+      <div id="combat-log"></div>
+    </div>
+
+    <!-- 右：功能面板 -->
+    <div id="right-column">
+      <!-- 标签栏 -->
+      <div id="tab-bar">
+        <div class="tab active" id="tab-stats">STATS</div>
+        <div class="tab" id="tab-inventory">ITEMS</div>
+        <div class="tab" id="tab-shop">SHOP</div>
+        <div class="tab" id="tab-skills">SKILLS</div>
+        <div class="tab" id="tab-zones">ZONES</div>
+      </div>
+      <!-- 内容面板 -->
+      <div id="side-panel"></div>
+    </div>
+
+  </div><!-- /#main-content -->
+
+  <!-- ── 底部状态栏 ──────────────────────────── -->
+  <div id="footer">
+    <span>IDLE HERO v0.1</span>
+    <span>|</span>
+    <span>Auto-saves every 30s</span>
+    <span>|</span>
+    <span class="cursor">_</span>
+  </div>
+
+</div><!-- /#app -->
+
+<!-- ── 脚本加载（顺序固定，靠全局变量通信） ── -->
+<script src="js/utils.js"></script>
+<script src="js/state.js"></script>
+<script src="js/monsters.js"></script>
+<script src="js/zones.js"></script>
+<script src="js/equipment.js"></script>
+<script src="js/skills.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/prestige.js"></script>
+<script src="js/save.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>

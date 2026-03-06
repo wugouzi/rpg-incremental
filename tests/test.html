@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>IDLE HERO — Test Suite</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #00ff41;
+      font-family: 'Courier New', 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 16px;
+    }
+
+    h1 {
+      color: #fff;
+      font-size: 18px;
+      letter-spacing: 3px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #1a3a1a;
+      padding-bottom: 8px;
+    }
+
+    #test-output {
+      max-width: 900px;
+    }
+
+    .summary {
+      font-size: 14px;
+      font-weight: bold;
+      padding: 8px 12px;
+      margin-bottom: 16px;
+      letter-spacing: 2px;
+    }
+
+    .summary.all-pass {
+      color: #000;
+      background: #00ff41;
+    }
+
+    .summary.has-fail {
+      color: #000;
+      background: #ff4444;
+    }
+
+    .suite {
+      margin-bottom: 16px;
+      border-left: 2px solid #1a3a1a;
+      padding-left: 8px;
+    }
+
+    .suite-header {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 4px;
+      letter-spacing: 1px;
+      padding: 2px 4px;
+    }
+
+    .suite-header.pass { color: #00ff41; }
+    .suite-header.fail { color: #ff4444; }
+
+    .test-row {
+      padding: 1px 8px;
+      font-size: 12px;
+    }
+
+    .test-row.pass { color: #007a1f; }
+    .test-row.fail { color: #ff4444; }
+
+    .icon { margin-right: 4px; }
+
+    .err {
+      display: block;
+      color: #ff6666;
+      font-size: 11px;
+      margin-left: 20px;
+      margin-top: 2px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    #loading {
+      color: #555;
+      font-size: 13px;
+      margin: 16px 0;
+      animation: blink 1s step-start infinite;
+    }
+
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    ::selection { background: #00ff41; color: #000; }
+  </style>
+</head>
+<body>
+
+<h1>▶ IDLE HERO — TEST SUITE</h1>
+<div id="loading">Running tests... _</div>
+<div id="test-output"></div>
+
+<!-- ── 游戏模块（测试依赖它们）──────── -->
+<script src="../js/utils.js"></script>
+<script src="../js/state.js"></script>
+<script src="../js/monsters.js"></script>
+<script src="../js/zones.js"></script>
+<script src="../js/equipment.js"></script>
+<script src="../js/skills.js"></script>
+<script src="../js/combat.js"></script>
+<script src="../js/prestige.js"></script>
+<script src="../js/save.js"></script>
+
+<!-- ── 测试框架 ──────────────────────── -->
+<script src="test-runner.js"></script>
+
+<!-- ── 各模块测试文件 ────────────────── -->
+<script src="test-utils.js"></script>
+<script src="test-state.js"></script>
+<script src="test-monsters-zones.js"></script>
+<script src="test-equipment.js"></script>
+<script src="test-skills.js"></script>
+<script src="test-combat.js"></script>
+<script src="test-save-prestige.js"></script>
+
+<!-- ── 启动测试 ──────────────────────── -->
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("loading").remove();
+    const result = TestRunner.run();
+    // 更新页面标题显示结果
+    document.title = `Tests: ${result.pass}✓ ${result.fail}✗ — IDLE HERO`;
+    // 滚动到顶部
+    window.scrollTo(0, 0);
+  });
+</script>
+
+</body>
+</html>
