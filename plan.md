@@ -232,26 +232,17 @@ incremental/
   - **背包改进**：装备列表按品质降序排序（legendary > epic > rare > common）；背包标题显示各品质数量统计（如 `[L:1 E:2 R:3 C:5]`）；当背包含有 common/rare 装备时显示 `[Sell All Common]` / `[Sell All Rare]` 一键批量出售按钮，点击后出售同品质所有装备并汇报总金币
   - **测试**：新增 `tests/test-achievements.js`（33 项测试），覆盖成就解锁条件/不重复解锁/gem 奖励/材料追踪计数/连胜统计字段/背包排序逻辑/bossDefeated 条件；`run-tests.js` 引入新测试文件；总计 **539 通过，0 失败**
 
+- [x] Bug 修复：每日任务 `_pickRandom` 重复登录任务（v0.14.2）：
+  - **根因**：`_pickRandom()` 内部使用 `[...QUEST_TEMPLATES]` 作为随机池，未排除 `daily_login`，导致随机选出的任务中可能包含两个登录任务，使 `getProgress().completed` 初始值为 2，任务完成后 `after > before` 判断失败
+  - **修复**：将 `_pickRandom()` 的随机池改为 `QUEST_TEMPLATES.filter(t => t.id !== "daily_login")`，确保登录任务不被重复随机选中
+  - 总测试：**711 通过，0 失败**
+
 - [x] Bug 修复：战士/游侠专精测试全绿（v0.14.1）：
   - **`getTotalAtk()` 包含怒气加成**：`state.js` 的 `getTotalAtk()` 新增 Berserker 怒气层数 × `rageAtkPerStack` 的乘数加成，使 `State.getTotalAtk()` 能正确反映当前怒气状态
   - **`getEffects()` 扫描主动技能参数**：`skills.js` 的 `getEffects()` 新增对主动技能 `war_cry` 的参数字段（`berserkAtkBonus`/`berserkSpdBonus`/`berserkDefPenalty`/`berserkDuration`）的扫描，将其暴露到 `effects` 对象供外部查询
   - **`result` 对象新增字段**：`getEffects()` 的 `result` 初始化新增 `berserkAtkBonus=0` 等四个 War Cry 参数字段
   - **测试修复**：`aceConsecutiveCrits` 重置测试移除 `withDeadeye`（其 `critAdd:0.15` 会让暴击率从 0 变 15% 导致随机暴击），改为仅解锁 `marksman_mastery` 以保证暴击率真正为 0
   - 总测试：**711 通过，0 失败**
-
-- [x] 战士 & 游侠专精系统 + 宝石商店 + 每日任务（v0.14.0）：
-  - **战士专精系统（Guardian / Berserker）**：
-    - `skills.js` 新增 Guardian 专精树（7 个技能：iron_fortress / shield_bash / stalwart / provoke / counter_stance / fortress_mastery / unbreakable）；核心玩法：格挡层数（0~5）→ 反击加成，挑衅（ATK+40% DEF-20%），血量 <20% 触发不屈（5s 无敌）
-    - `skills.js` 新增 Berserker 专精树（7 个技能：bloodlust / reckless_strike / war_cry / blood_frenzy / execute / berserker_mastery / death_wish）；核心玩法：怒气层数（0~10 →ATK 加成），狂暴 8s（ATK+50% SPD+0.5 DEF-30%），低血量<25% 执行（400% ATK），血量<30% 死亡意志
-    - `state.js` 新增 `warrior` 状态对象：blockStacks / provokeActive/Timer / unbreakableActive/Timer / rageStacks / berserkActive/Timer
-  - **游侠专精系统（Marksman / Shadowblade）**：
-    - `skills.js` 新增 Marksman 专精树（7 个技能：focused_shot / armor_pierce / snipe / piercing_shots / kill_shot / marksman_mastery / deadeye）；核心玩法：穿甲（全局 -20% DEF）、保底暴击射击、低血量（<30%）秒杀、5 连击触发 Ace Shot（500% ATK）
-    - `skills.js` 新增 Shadowblade 专精树（7 个技能：backstab / venom_blade / smoke_screen / shadow_mark / shadow_clone / shadowblade_mastery / assassinate）；核心玩法：毒+背刺协同（中毒时 Backstab 350%）、闪避后 Shadow Mark 叠加伤害、影分身 60% 伤害复制、终极技能 Assassinate（600% 无视防御）
-    - `state.js` 新增 `ranger` 状态对象：poisonStacks / shadowMarkStacks / cloneActive / aceConsecutiveCrits 等
-  - **专精 UI 与技能树渲染**：`ui.js` 的 `renderSkills` 新增：战士/游侠专精选择 UI（含禁用检查/错误提示）；已选专精标签显示；技能树按「BASE / CHOOSE SPEC / 专精子组」三层折叠结构渲染；`switchTab` 和 `refreshSidePanel` 均支持 `quests` 标签页
-  - **宝石商店 Gem Shop**（`js/gemshop.js`）：10 种永久升级（ATK/HP/DEF/Gold/EXP/Crit/DropRate/Inventory/Prestige/Offline 加成），费用指数递增（`baseCost × scale^n`）；4 种一次性特殊解锁（Auto-Prestige Alert / Second Chance / Elite Magnetism / Craftsman's Table）；`getGemBonus()` 供全局属性系统调用；`getMaxInventory()` 含扩容；Shop 标签页底部嵌入 GemShop UI（永久升级 + 特殊解锁两区域）
-  - **每日任务 Daily Quest**（`js/dailyquest.js`）：16 种任务模板（击杀/精英击杀/连胜/伤害/金币/Boss/休息/登录各类型）；每日刷新（日期变更自动重置会话数据并随机选 3 任务，含固定登录任务）；登录任务自动完成自动领取；进度由 `combat.js` 的 onMonsterDeath / onDamage / onGoldEarned / onBossKill / REST 按钮 5 个钩子驱动；QUESTS 标签页展示任务列表（进度条/奖励/状态）+ 今日会话统计
-  - **测试**：新增 `tests/test-warrior-ranger-spec.js`（38 项）、`tests/test-gemshop.js`（30 项）、`tests/test-dailyquest.js`（28 项）；`run-tests.js` 新增 gemshop.js / dailyquest.js 模块引入；总计 **635 通过，0 失败**
 
 ---
 

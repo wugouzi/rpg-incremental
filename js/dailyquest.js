@@ -164,9 +164,9 @@ const DailyQuest = (() => {
     return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
   }
 
-  /** 从 QUEST_TEMPLATES 中随机选 count 个不重复任务 */
+  /** 从 QUEST_TEMPLATES 中随机选 count 个不重复任务（排除登录任务） */
   function _pickRandom(count) {
-    const pool = [...QUEST_TEMPLATES];
+    const pool = QUEST_TEMPLATES.filter(t => t.id !== "daily_login");
     const result = [];
     while (result.length < count && pool.length > 0) {
       const idx = Math.floor(Math.random() * pool.length);
