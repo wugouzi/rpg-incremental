@@ -232,6 +232,13 @@ incremental/
   - **背包改进**：装备列表按品质降序排序（legendary > epic > rare > common）；背包标题显示各品质数量统计（如 `[L:1 E:2 R:3 C:5]`）；当背包含有 common/rare 装备时显示 `[Sell All Common]` / `[Sell All Rare]` 一键批量出售按钮，点击后出售同品质所有装备并汇报总金币
   - **测试**：新增 `tests/test-achievements.js`（33 项测试），覆盖成就解锁条件/不重复解锁/gem 奖励/材料追踪计数/连胜统计字段/背包排序逻辑/bossDefeated 条件；`run-tests.js` 引入新测试文件；总计 **539 通过，0 失败**
 
+- [x] Bug 修复：战士/游侠专精测试全绿（v0.14.1）：
+  - **`getTotalAtk()` 包含怒气加成**：`state.js` 的 `getTotalAtk()` 新增 Berserker 怒气层数 × `rageAtkPerStack` 的乘数加成，使 `State.getTotalAtk()` 能正确反映当前怒气状态
+  - **`getEffects()` 扫描主动技能参数**：`skills.js` 的 `getEffects()` 新增对主动技能 `war_cry` 的参数字段（`berserkAtkBonus`/`berserkSpdBonus`/`berserkDefPenalty`/`berserkDuration`）的扫描，将其暴露到 `effects` 对象供外部查询
+  - **`result` 对象新增字段**：`getEffects()` 的 `result` 初始化新增 `berserkAtkBonus=0` 等四个 War Cry 参数字段
+  - **测试修复**：`aceConsecutiveCrits` 重置测试移除 `withDeadeye`（其 `critAdd:0.15` 会让暴击率从 0 变 15% 导致随机暴击），改为仅解锁 `marksman_mastery` 以保证暴击率真正为 0
+  - 总测试：**711 通过，0 失败**
+
 - [x] 战士 & 游侠专精系统 + 宝石商店 + 每日任务（v0.14.0）：
   - **战士专精系统（Guardian / Berserker）**：
     - `skills.js` 新增 Guardian 专精树（7 个技能：iron_fortress / shield_bash / stalwart / provoke / counter_stance / fortress_mastery / unbreakable）；核心玩法：格挡层数（0~5）→ 反击加成，挑衅（ATK+40% DEF-20%），血量 <20% 触发不屈（5s 无敌）

@@ -274,9 +274,16 @@ const State = (() => {
     const eq = getEquipBonus();
     const sk = getSkillEffects();
     const buf = getBuffBonus();
+    // 怒气加成：Berserker 每层怒气提供 rageAtkPerStack 的 ATK 乘数加成
+    let rageMult = 1;
+    if (data.warrior && sk.rageAtkPerStack > 0) {
+      const rageStacks = data.warrior.rageStacks || 0;
+      rageMult = 1 + rageStacks * sk.rageAtkPerStack;
+    }
     return Math.floor(
       (data.hero.baseAtk + eq.atk) * sk.atkMult * data.hero.prestigeBonus
       * (1 + buf.atkPct / 100)
+      * rageMult
     );
   }
 

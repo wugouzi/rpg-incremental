@@ -1221,11 +1221,80 @@ const Skills = (() => {
       lastRiteHeal: 0,
       magicDmgMult: 1,
       castMpRegen: 0,
+      // ── 战士 Guardian 专精 ──
+      blockChance: 0,           // 受击时生成格挡层的概率
+      blockMaxStacks: 3,        // 最大格挡层数（默认3）
+      blockDmgReduce: 0,        // 每格挡层减少的伤害比例
+      blockMaxBonus: 0,         // 额外格挡层上限
+      flatDmgReduce: 0,         // 固定比例减伤
+      counterAfterBlock: false, // 消耗格挡后下次攻击有加成
+      counterDmgBonus: 0,       // 反击伤害加成
+      defToAtk: 0,              // DEF 转化为 ATK 的比例
+      hprAdd: 0,                // 额外 HP 回复速率加成
+      unbreakable: false,       // 不屈：HP < 阈值时触发无敌
+      unbreakableHpThresh: 0,
+      unbreakableDuration: 0,
+      provokeDmgTaken: 0,       // 挑衅期间受到的额外伤害系数（被读取，非效果字段）
+      // ── 战士 Berserker 专精 ──
+      rageOnKill: 0,            // 每次击杀获得怒气层数
+      rageMaxStacks: 10,        // 最大怒气层数
+      rageAtkPerStack: 0,       // 每层怒气提供的 ATK 加成
+      rageSpdPerFive: 0,        // 每5层怒气的速度加成
+      maxRageCritBonus: 0,      // 满怒气时的额外暴击率
+      ragePersistOnDeath: false, // 死亡时怒气不清零
+      rageDeathLoss: 0,         // 死亡时减少的怒气数
+      recklessHeal: 0,          // 鲁莽打击自伤时回血比例
+      // War Cry 主动技能参数（需通过 getEffects 读取）
+      berserkAtkBonus: 0,       // 狂暴期间 ATK 加成
+      berserkSpdBonus: 0,       // 狂暴期间 SPD 加成
+      berserkDefPenalty: 0,     // 狂暴期间 DEF 惩罚
+      berserkDuration: 0,       // 狂暴持续时间（ms）
+      deathWish: false,         // 死亡意志：低血量时强化
+      deathWishAtkBonus: 0,
+      deathWishCritBonus: 0,
+      deathWishHpThresh: 0,
+      deathWishRecklessBonus: 0,
+      // ── 游侠 Marksman 专精 ──
+      globalDefBypass: 0,       // 所有攻击无视 DEF 的比例
+      guaranteedCrit: false,    // 技能必暴击（由 combat 检查）
+      critPoisonBonus: 0,       // 暴击时额外毒伤（忽视 DEF）
+      killShotDmg: 0,           // Kill Shot 秒杀伤害倍率
+      killShotNormalDmg: 0,     // Kill Shot 普通伤害倍率
+      killShotThresh: 0,        // Kill Shot 触发阈值
+      aceShot: false,           // Marksman Mastery：Ace Shot
+      aceShotCount: 5,
+      aceShotDmg: 5.0,
+      focusedShotCdReduce: 0,   // Dead Eye：Focused Shot CD 减少
+      // ── 游侠 Shadowblade 专精 ──
+      poisonStacks: 1,          // 最大毒层数（默认1）
+      poisonCanCrit: false,     // 毒可暴击
+      critRefreshPoison: false, // 暴击时刷新毒持续时间
+      backstabAlwaysCrit: false, // 目标中毒时背刺必暴
+      shadowMarkOnDodge: false, // 闪避后累积影标记
+      shadowMarkDmgBonus: 0,    // 每层影标记的伤害加成
+      shadowMarkMaxStacks: 3,   // 最大影标记层数
+      shadowCloneDuration: 0,   // 影分身持续时间
+      shadowCloneDmgRatio: 0,   // 影分身伤害比例
+      smokeScreenDuration: 0,   // 烟雾弹无敌时间
+      smokeScreenCritBonus: 0,  // 烟雾弹后下次攻击额外暴击倍率
+      assassinateGoldBonus: 0,  // 暗杀击杀后额外金币加成
     };
 
     Object.keys(state.unlockedSkills).forEach(id => {
       const tpl = TEMPLATE_MAP[id];
-      if (!tpl || tpl.type !== "passive") return;
+      if (!tpl) return;
+      // 主动技能：仅提取 berserker War Cry 的参数配置字段
+      if (tpl.type === "active") {
+        if (tpl.id === "war_cry") {
+          const we = tpl.effect;
+          if (we.berserkAtkBonus)   result.berserkAtkBonus  = we.berserkAtkBonus;
+          if (we.berserkSpdBonus)   result.berserkSpdBonus  = we.berserkSpdBonus;
+          if (we.berserkDefPenalty) result.berserkDefPenalty = we.berserkDefPenalty;
+          if (we.berserkDuration)   result.berserkDuration  = we.berserkDuration;
+        }
+        return; // 其余主动技能不影响 getEffects
+      }
+      if (tpl.type !== "passive") return;
       const e = tpl.effect;
       if (e.atkMult)              result.atkMult              *= e.atkMult;
       if (e.defMult)              result.defMult              *= e.defMult;
@@ -1277,6 +1346,56 @@ const Skills = (() => {
       if (e.lastRiteHeal)         result.lastRiteHeal          = e.lastRiteHeal;
       if (e.magicDmgMult)         result.magicDmgMult         *= e.magicDmgMult;
       if (e.castMpRegen)          result.castMpRegen          += e.castMpRegen;
+      // 战士 Guardian 专精
+      if (e.blockChance)          result.blockChance          += e.blockChance;
+      if (e.blockMaxStacks)       result.blockMaxStacks        = Math.max(result.blockMaxStacks, e.blockMaxStacks);
+      if (e.blockDmgReduce)       result.blockDmgReduce       += e.blockDmgReduce;
+      if (e.blockMaxBonus)        result.blockMaxBonus        += e.blockMaxBonus;
+      if (e.flatDmgReduce)        result.flatDmgReduce        += e.flatDmgReduce;
+      if (e.counterAfterBlock)    result.counterAfterBlock     = true;
+      if (e.counterDmgBonus)      result.counterDmgBonus      += e.counterDmgBonus;
+      if (e.defToAtk)             result.defToAtk             += e.defToAtk;
+      if (e.hprAdd)               result.hprAdd               += e.hprAdd;
+      if (e.unbreakable)          result.unbreakable           = true;
+      if (e.unbreakableHpThresh)  result.unbreakableHpThresh   = e.unbreakableHpThresh;
+      if (e.unbreakableDuration)  result.unbreakableDuration   = e.unbreakableDuration;
+      // 战士 Berserker 专精
+      if (e.rageOnKill)           result.rageOnKill           += e.rageOnKill;
+      if (e.rageMaxStacks)        result.rageMaxStacks         = Math.max(result.rageMaxStacks, e.rageMaxStacks);
+      if (e.rageAtkPerStack != null && e.rageAtkPerStack > 0) result.rageAtkPerStack = e.rageAtkPerStack;
+      if (e.rageSpdPerFive)       result.rageSpdPerFive       += e.rageSpdPerFive;
+      if (e.maxRageCritBonus)     result.maxRageCritBonus     += e.maxRageCritBonus;
+      if (e.ragePersistOnDeath)   result.ragePersistOnDeath    = true;
+      if (e.rageDeathLoss)        result.rageDeathLoss         = e.rageDeathLoss;
+      if (e.recklessHeal)         result.recklessHeal         += e.recklessHeal;
+      if (e.deathWish)            result.deathWish             = true;
+      if (e.deathWishAtkBonus)    result.deathWishAtkBonus     = e.deathWishAtkBonus;
+      if (e.deathWishCritBonus)   result.deathWishCritBonus    = e.deathWishCritBonus;
+      if (e.deathWishHpThresh)    result.deathWishHpThresh     = e.deathWishHpThresh;
+      if (e.deathWishRecklessBonus) result.deathWishRecklessBonus = e.deathWishRecklessBonus;
+      // 游侠 Marksman 专精
+      if (e.globalDefBypass)      result.globalDefBypass      += e.globalDefBypass;
+      if (e.critPoisonBonus)      result.critPoisonBonus      += e.critPoisonBonus;
+      if (e.killShotDmg)          result.killShotDmg           = e.killShotDmg;
+      if (e.killShotNormalDmg)    result.killShotNormalDmg     = e.killShotNormalDmg;
+      if (e.killShotThresh)       result.killShotThresh        = e.killShotThresh;
+      if (e.aceShot)              result.aceShot               = true;
+      if (e.aceShotCount)         result.aceShotCount          = e.aceShotCount;
+      if (e.aceShotDmg)           result.aceShotDmg            = e.aceShotDmg;
+      if (e.focusedShotCdReduce)  result.focusedShotCdReduce  += e.focusedShotCdReduce;
+      // 游侠 Shadowblade 专精
+      if (e.poisonStacks)         result.poisonStacks          = Math.max(result.poisonStacks, e.poisonStacks);
+      if (e.poisonCanCrit)        result.poisonCanCrit         = true;
+      if (e.critRefreshPoison)    result.critRefreshPoison     = true;
+      if (e.backstabAlwaysCrit)   result.backstabAlwaysCrit    = true;
+      if (e.shadowMarkOnDodge)    result.shadowMarkOnDodge     = true;
+      if (e.shadowMarkDmgBonus)   result.shadowMarkDmgBonus    = e.shadowMarkDmgBonus;
+      if (e.shadowMarkMaxStacks)  result.shadowMarkMaxStacks   = Math.max(result.shadowMarkMaxStacks, e.shadowMarkMaxStacks);
+      if (e.shadowCloneDuration)  result.shadowCloneDuration   = e.shadowCloneDuration;
+      if (e.shadowCloneDmgRatio)  result.shadowCloneDmgRatio   = e.shadowCloneDmgRatio;
+      if (e.smokeScreenDuration)  result.smokeScreenDuration   = e.smokeScreenDuration;
+      if (e.smokeScreenCritBonus) result.smokeScreenCritBonus  = e.smokeScreenCritBonus;
+      if (e.assassinateGoldBonus) result.assassinateGoldBonus  = e.assassinateGoldBonus;
     });
 
     // thunder_mastery：充能层数动态贡献暴击率

@@ -29,6 +29,32 @@ const Combat = (() => {
   let hpRegenAcc = 0;        // HP 回复小数累计
   let mpRegenAcc = 0;        // MP 回复小数累计
 
+  // ── 战士 Guardian 专精状态 ──────────────────
+  let guardianStunTimer = 0;     // Shield Bash 眩晕计时
+  let guardianProvokeTimer = 0;  // Provoke 挑衅计时
+  let guardianProvokeActive = false;
+  let guardianUnbreakableTimer = 0;  // Unbreakable 不屈计时
+  let guardianUnbreakableActive = false;
+  let guardianCounterReady = false;  // 消耗格挡后，下次攻击有反击加成
+
+  // ── 战士 Berserker 专精状态 ─────────────────
+  let berserkTimer = 0;          // War Cry 狂暴计时
+  let berserkActive = false;
+
+  // ── 游侠 Shadowblade 专精状态 ───────────────
+  let smokeScreenTimer = 0;      // Smoke Screen 烟雾弹计时
+  let smokeScreenActive = false;
+  let smokeScreenNextCrit = false; // 烟雾弹后下次攻击必暴
+  let shadowCloneTimer = 0;      // Shadow Clone 影分身计时
+  let shadowCloneActive = false;
+  let assassinateNextGoldBonus = false; // Assassinate 金币加成标记
+
+  // ── 游侠 Marksman 专精状态 ──────────────────
+  // Ace Shot 连续暴击计数（由 ranger.aceConsecutiveCrits 维护）
+
+  // ── Guardian 眩晕计时（Shield Bash）──────────
+  let guardianStunActive = false;  // 怪物是否被眩晕
+
   // ─────────────────────────────────────────
   // 辅助：获取充能上限
   // ─────────────────────────────────────────
@@ -171,6 +197,24 @@ const Combat = (() => {
     lightningRodHits   = 0;
     iceBarrierHp = 0;
 
+    // 重置战士专精 per-fight 状态
+    guardianStunTimer = 0;
+    guardianStunActive = false;
+    guardianProvokeTimer = 0;
+    guardianProvokeActive = false;
+    guardianCounterReady = false;
+    // unbreakable 跨战斗保持（死亡时才重置）
+    berserkTimer = 0;
+    berserkActive = false;
+
+    // 重置游侠 Shadowblade per-fight 状态
+    smokeScreenTimer = 0;
+    smokeScreenActive = false;
+    smokeScreenNextCrit = false;
+    shadowCloneTimer = 0;
+    shadowCloneActive = false;
+    assassinateNextGoldBonus = false;
+
     // 重置法师 per-fight 状态
     if (state.mage) {
       // Pyro: burn 层数跨战斗保留（火焰余烬延续到下一个怪物）
@@ -276,11 +320,68 @@ if (window.UI) {
 
     let dmgMult = skillEffect ? (skillEffect.dmgMult || 1) : 1;
 
-    // DEF bypass（Ball Lightning）
-    const defBypass = skillEffect && skillEffect.defBypass ? skillEffect.defBypass : 0;
-    const effectiveDef = Math.floor((monster.def || 0) * (1 - defBypass));
+    // DEF bypass（Ball Lightning + Marksman globalDefBypass）
+    const globalBypass = effects.globalDefBypass || 0;
+    const skillBypass = skillEffect && skillEffect.defBypass ? skillEffect.defBypass : 0;
+    const totalDefBypass = Math.min(1, globalBypass + skillBypass);
+    const effectiveDef = Math.floor((monster.def || 0) * (1 - totalDefBypass));
 
-    let rawDmg = Math.max(1, atk * dmgMult * frozenAtkMult - effectiveDef);
+    // ── 战士 Berserker：怒气 ATK 加成 ──
+    const isWarrior = state.hero.class === "warrior";
+    let rageAtkBonus = 1;
+    if (isWarrior && state.warrior && effects.rageOnKill > 0) {
+      const rageStacks = state.warrior.rageStacks || 0;
+      rageAtkBonus = 1 + rageStacks * effects.rageAtkPerStack;
+      // death_wish：HP < 30% 时额外 ATK
+      if (effects.deathWish && state.hero.hp < State.getTotalMaxHp() * effects.deathWishHpThresh) {
+        rageAtkBonus += effects.deathWishAtkBonus;
+      }
+    }
+
+    // ── 战士 Guardian：Provoke ATK 加成 ──
+    let provokeAtkBonus = 1;
+    if (isWarrior && guardianProvokeActive) {
+      const tpl = Skills.getTemplate ? Skills.getTemplate("provoke") : null;
+      const provokeBonus = tpl ? (tpl.effect.provokeAtkBonus || 0.4) : 0.4;
+      provokeAtkBonus = 1 + provokeBonus;
+    }
+
+    // ── 战士 Guardian：反击加成（Counter Stance）──
+    let counterDmgMult = 1;
+    if (guardianCounterReady && effects.counterAfterBlock && effects.counterDmgBonus > 0) {
+      counterDmgMult = 1 + effects.counterDmgBonus;
+    }
+
+    // ── 游侠 Shadowblade：Shadow Mark 叠加伤害 ──
+    const isRanger = state.hero.class === "ranger";
+    let shadowMarkMult = 1;
+    if (isRanger && state.ranger && effects.shadowMarkOnDodge) {
+      const markStacks = state.ranger.shadowMarkStacks || 0;
+      shadowMarkMult = 1 + markStacks * effects.shadowMarkDmgBonus;
+    }
+
+    // ── 游侠 Marksman：Ace Shot 王牌射击（消耗连暴计数）──
+    let aceShotActive = false;
+    if (isRanger && state.ranger && effects.aceShot) {
+      if (state.ranger.aceConsecutiveCrits >= effects.aceShotCount) {
+        aceShotActive = true;
+      }
+    }
+
+    // ── 战士 Berserker：War Cry 狂暴 ATK 加成 ──
+    let berserkAtkMult = 1;
+    if (isWarrior && berserkActive && effects.berserkAtkBonus) {
+      berserkAtkMult = 1 + effects.berserkAtkBonus;
+    }
+    // ── 战士 Berserker：Death Wish - Reckless Strike 额外加成 ──
+    // （在 tryUseActiveSkill 中处理，calcHeroDmg 里已处理普通 deathWish ATK）
+
+    let rawDmg = Math.max(1, atk * dmgMult * frozenAtkMult * rageAtkBonus * provokeAtkBonus * counterDmgMult * shadowMarkMult * berserkAtkMult - effectiveDef);
+
+    // Ace Shot 强制覆盖伤害
+    if (aceShotActive) {
+      rawDmg = Math.max(rawDmg, atk * effects.aceShotDmg);
+    }
 
     // magic skill damage mult（arcane_mastery）
     if (skillEffect && effects.magicDmgMult > 1) {
@@ -322,10 +423,29 @@ if (window.UI) {
       }
     }
 
-    // 暴击检查（含冰冻暴击加成 + Spell Surge）
+    // 暴击检查（含冰冻暴击加成 + Spell Surge + 专精加成）
     let critRate = State.getTotalCrit();
     if (isFrozen && effects.freezeCritBonus > 0) critRate = Math.min(0.95, critRate + effects.freezeCritBonus);
-    const isCrit = Utils.chance(critRate);
+
+    // death_wish：低血量暴击率加成
+    if (effects.deathWish && state.hero.hp < State.getTotalMaxHp() * effects.deathWishHpThresh) {
+      critRate = Math.min(0.95, critRate + effects.deathWishCritBonus);
+    }
+    // blood_frenzy：满怒气暴击率加成
+    const isWarriorBerserker = isWarrior && state.warrior && state.warrior.spec === "berserker";
+    if (isWarriorBerserker && effects.maxRageCritBonus > 0) {
+      const rageStacks = state.warrior.rageStacks || 0;
+      if (rageStacks >= effects.rageMaxStacks) {
+        critRate = Math.min(0.95, critRate + effects.maxRageCritBonus);
+      }
+    }
+
+    // 必暴击：Snipe/SmokeScreen/Ace Shot
+    const forceCrit = (skillEffect && skillEffect.guaranteedCrit)
+      || smokeScreenNextCrit
+      || aceShotActive;
+
+    const isCrit = forceCrit || Utils.chance(critRate);
     // Spell Surge：MP > 80% 时额外暴击判定
     const maxMp = State.getTotalMaxMp();
     const spellSurgeCrit = (skillEffect && effects.spellSurge && state.hero.mp > maxMp * 0.8)
@@ -334,12 +454,55 @@ if (window.UI) {
     const effectiveCrit = isCrit || spellSurgeCrit;
 
     if (effectiveCrit) {
-      rawDmg = Math.floor(rawDmg * effects.critMult);
+      // Smoke Screen 额外暴击加成（+100% dmg）
+      let critMultFinal = effects.critMult;
+      if (smokeScreenNextCrit && effects.smokeScreenCritBonus > 0) {
+        critMultFinal += effects.smokeScreenCritBonus;
+      }
+      rawDmg = Math.floor(rawDmg * critMultFinal);
+      // 消耗 smokeScreenNextCrit
+      if (smokeScreenNextCrit) smokeScreenNextCrit = false;
+      // Ace Shot 消耗连暴计数
+      if (aceShotActive && isRanger && state.ranger) {
+        state.ranger.aceConsecutiveCrits = 0;
+        if (window.UI) UI.addLog(`>> [MARKSMAN] ACE SHOT! 500% ATK!`, "yellow");
+      }
+      // Shadow Mark：暴击后消耗影标记
+      if (isRanger && state.ranger && effects.shadowMarkOnDodge) {
+        const marksBefore = state.ranger.shadowMarkStacks || 0;
+        if (marksBefore > 0) state.ranger.shadowMarkStacks = 0;
+      }
+      // Marksman：暴击时额外毒伤（critPoisonBonus）
+      if (isRanger && effects.critPoisonBonus > 0 && state.currentMonster) {
+        const poisonBonusDmg = Math.floor(State.getTotalAtk() * effects.critPoisonBonus);
+        state.currentMonster.currentHp -= poisonBonusDmg;
+        state.stats.totalDmgDealt += poisonBonusDmg;
+        if (window.UI) UI.addLog(`>> [MARKSMAN] Piercing poison: +${poisonBonusDmg} dmg`, "cyan");
+      }
+      // critRefreshPoison（Shadowblade Mastery）
+      if (isRanger && effects.critRefreshPoison && isPoisoned) {
+        poisonTimer = effects.poisonDuration || 3000;
+      }
+      // Marksman 连续暴击计数（血条追踪）
+      if (isRanger && state.ranger && effects.aceShot && !aceShotActive) {
+        state.ranger.aceConsecutiveCrits = (state.ranger.aceConsecutiveCrits || 0) + 1;
+      }
+    } else {
+      // 未暴击：重置连续暴击计数
+      if (isRanger && state.ranger && effects.aceShot) {
+        state.ranger.aceConsecutiveCrits = 0;
+      }
+      // Shadow Mark 不消耗
     }
 
     // thunder_mastery: Ball Lightning crit 不消耗充能（已消耗，此处回补）
     if (isStorm && skillEffect && skillEffect.id === "ball_lightning" && effectiveCrit && effects.critNoConsumeCharge) {
       state.mage.charge = Math.min(getChargeCap(), state.mage.charge + chargesConsumed);
+    }
+
+    // 每日任务：伤害统计
+    if (window.DailyQuest && Math.floor(rawDmg) > 0) {
+      DailyQuest.onDamage(Math.floor(rawDmg));
     }
 
     return { damage: Math.floor(rawDmg), isCrit: effectiveCrit, chargesConsumed };
@@ -367,9 +530,24 @@ if (window.UI) {
       rawDmg = Math.max(1, Math.floor(rawDmg * (1 - resVal / 100)));
     }
 
-    // 闪避检查
-    if (Utils.chance(effects.dodgeAdd || 0)) {
+    // 闪避检查（含 Smoke Screen 完全闪避）
+    if (smokeScreenActive || Utils.chance(effects.dodgeAdd || 0)) {
+      // Shadow Mark：闪避后积累标记
+      if (!smokeScreenActive && effects.shadowMarkOnDodge) {
+        const state2 = State.get();
+        if (!state2.ranger) state2.ranger = {};
+        const maxMark = effects.shadowMarkMaxStacks || 3;
+        state2.ranger.shadowMarkStacks = Math.min(maxMark, (state2.ranger.shadowMarkStacks || 0) + 1);
+        if (window.UI) UI.addLog(`>> [SHADOW] Mark +1 (${state2.ranger.shadowMarkStacks}/${maxMark})`, "cyan");
+      }
+      // Smoke Screen 结束后标记下次攻击必暴
+      if (smokeScreenActive) smokeScreenNextCrit = true;
       return { damage: 0, mpDmg: 0, dodged: true, element: monster.element };
+    }
+
+    // Unbreakable（Guardian）：所有伤害上限 1
+    if (guardianUnbreakableActive) {
+      return { damage: 1, mpDmg: 0, dodged: false, element: monster.element };
     }
 
     // Blink 免疫
@@ -428,6 +606,40 @@ if (window.UI) {
       }
     }
 
+    // ── Guardian：受击时生成格挡层（Iron Fortress blockChance）──
+    const isWarriorGuardian = state.hero.class === "warrior" && state.warrior && state.warrior.spec === "guardian";
+    if (isWarriorGuardian && effects.blockChance > 0) {
+      const maxBlocks = (effects.blockMaxStacks || 3) + (effects.blockMaxBonus || 0);
+      if (state.warrior.blockStacks < maxBlocks && Utils.chance(effects.blockChance)) {
+        state.warrior.blockStacks = Math.min(maxBlocks, state.warrior.blockStacks + 1);
+        if (window.UI) UI.addLog(`>> [GUARD] Block stack! (${state.warrior.blockStacks}/${maxBlocks})`, "cyan");
+        if (window.UI) UI.markSidePanelDirty();
+      }
+    }
+
+    // ── Guardian：格挡减伤 ──
+    if (isWarriorGuardian && effects.blockDmgReduce > 0 && state.warrior.blockStacks > 0) {
+      // 消耗1层格挡
+      const blockReduction = effects.blockDmgReduce * state.warrior.blockStacks;
+      rawDmg = Math.max(1, Math.floor(rawDmg * (1 - blockReduction)));
+      state.warrior.blockStacks--;
+      if (window.UI) UI.addLog(`>> [GUARD] Block! -${Math.round(blockReduction*100)}% dmg (${state.warrior.blockStacks} left)`, "cyan");
+      // Counter Stance：消耗格挡后标记下次攻击加成
+      if (effects.counterAfterBlock) guardianCounterReady = true;
+    }
+
+    // ── Guardian：Stalwart 固定减伤 ──
+    if (isWarriorGuardian && effects.flatDmgReduce > 0) {
+      rawDmg = Math.max(1, Math.floor(rawDmg * (1 - effects.flatDmgReduce)));
+    }
+
+    // ── Guardian：Provoke 额外受伤 ──
+    if (isWarriorGuardian && guardianProvokeActive) {
+      rawDmg = Math.floor(rawDmg * 1.25); // +25% 受伤
+    }
+
+    // ── Berserker：War Cry DEF 惩罚（已在 getTotalDef 中处理，不用重复）──
+
     // Mana Shield：10% 转 MP 损耗
     let mpDmg = 0;
     if (effects.mpAbsorb > 0 && state.hero.mp > 0) {
@@ -457,6 +669,22 @@ if (window.UI) {
     UI.addLog(`>> You${skillName} hit ${monster.name} for ${damage} dmg.${critLabel}`, "green");
 
     const effects = Skills.getEffects();
+
+    // 影分身：复制伤害
+    const isRangerForClone = state.hero.class === "ranger";
+    if (isRangerForClone && shadowCloneActive && state.currentMonster && state.currentMonster.currentHp > 0) {
+      const cloneRatio = Skills.getEffects().shadowCloneDmgRatio || 0.6;
+      const cloneDmg = Math.floor(damage * cloneRatio);
+      if (cloneDmg > 0) {
+        state.currentMonster.currentHp -= cloneDmg;
+        state.stats.totalDmgDealt += cloneDmg;
+        if (window.UI) UI.addLog(`>> [SHADOW] Clone echoes: +${cloneDmg} dmg!`, "cyan");
+        if (state.currentMonster.currentHp <= 0) {
+          onMonsterDeath();
+          return;
+        }
+      }
+    }
 
     // Mana Drain：回复 MP
     if (skillEffect && skillEffect.manaDrainReturn) {
@@ -603,6 +831,18 @@ if (window.UI) {
       UI.addLog(`>> ${monster.name} hits you for ${damage} dmg.`, "red");
     }
 
+    // ── Guardian：Unbreakable 触发（HP < 阈值时激活）──
+    const isWarriorGuardian = state.hero.class === "warrior" && state.warrior && state.warrior.spec === "guardian";
+    if (isWarriorGuardian && effects.unbreakable && !guardianUnbreakableActive) {
+      const thresh = effects.unbreakableHpThresh || 0.2;
+      if (state.hero.hp > 0 && state.hero.hp < State.getTotalMaxHp() * thresh) {
+        guardianUnbreakableActive = true;
+        guardianUnbreakableTimer = effects.unbreakableDuration || 5000;
+        if (window.UI) UI.addLog(`>> [GUARD] UNBREAKABLE! Immune for ${(guardianUnbreakableTimer/1000).toFixed(0)}s!`, "yellow");
+        if (window.UI) UI.markSidePanelDirty();
+      }
+    }
+
     // Last Rite：首次 HP < 20% 触发（含一击必杀情形，hp=0 时也检查）
     if (effects.lastRite && state.mage && !state.mage.lastRiteUsed) {
       const maxHp = State.getTotalMaxHp();
@@ -706,6 +946,95 @@ if (window.UI) {
         const atk = State.getTotalAtk();
         iceBarrierHp = Math.floor(atk * 2.0);
         if (window.UI) UI.addLog(`>> [CRYO] Ice Barrier: ${iceBarrierHp} shield!`, "cyan");
+      } else if (skill.id === "shield_bash") {
+        // ── Guardian：Shield Bash 眩晕 + 伤害 ──
+        heroAttack({ name: skill.name, dmgMult: e.dmgMult || 1.2 });
+        if (state.currentMonster && state.currentMonster.currentHp > 0) {
+          guardianStunActive = true;
+          guardianStunTimer = e.stunDuration || 2000;
+          if (window.UI) UI.addLog(`>> [GUARD] Shield Bash! ${state.currentMonster.name} stunned for ${(guardianStunTimer/1000).toFixed(1)}s!`, "cyan");
+        }
+      } else if (skill.id === "provoke") {
+        // ── Guardian：Provoke 挑衅激活 ──
+        guardianProvokeActive = true;
+        guardianProvokeTimer = e.provokeDuration || 5000;
+        if (window.UI) UI.addLog(`>> [GUARD] Provoke! ATK+40% but take +25% dmg for ${(guardianProvokeTimer/1000).toFixed(0)}s!`, "cyan");
+      } else if (skill.id === "war_cry") {
+        // ── Berserker：War Cry 激活狂暴 ──
+        berserkActive = true;
+        berserkTimer = e.berserkDuration || 8000;
+        if (state.warrior) { state.warrior.berserkActive = true; state.warrior.berserkTimer = berserkTimer; }
+        if (window.UI) UI.addLog(`>> [BERSERK] WAR CRY! ATK+50% SPD+0.5 DEF-30% for ${(berserkTimer/1000).toFixed(0)}s!`, "yellow");
+      } else if (skill.id === "reckless_strike") {
+        // ── Berserker：鲁莽打击：高伤 + 自伤 ──
+        const recklessMult = e.dmgMult || 2.5;
+        // Death Wish 加成
+        const dwBonus = (effects.deathWish && state.hero.hp < State.getTotalMaxHp() * (effects.deathWishHpThresh || 0.3))
+          ? (effects.deathWishRecklessBonus || 0.8) : 0;
+        heroAttack({ name: skill.name, dmgMult: recklessMult * (1 + dwBonus) });
+        // 自伤
+        const selfDmgPct = e.selfDmgPct || 0.15;
+        const selfDmg = Math.floor(State.getTotalMaxHp() * selfDmgPct);
+        if (selfDmg > 0) {
+          state.hero.hp = Math.max(1, state.hero.hp - selfDmg); // 不能死亡
+          // Berserker Mastery：自伤回血
+          if (effects.recklessHeal > 0) {
+            const { damage: dealtDmg } = calcHeroDmg({ name: skill.name, dmgMult: 0 }); // 仅估算已发出，直接用 selfDmg
+            const heal = Math.floor(selfDmg * effects.recklessHeal);
+            state.hero.hp = Math.min(State.getTotalMaxHp(), state.hero.hp + heal);
+            if (window.UI) UI.addLog(`>> [BERSERK] Reckless self-dmg: -${selfDmg} HP → Mastery heals +${heal}`, "yellow");
+          } else {
+            if (window.UI) UI.addLog(`>> [BERSERK] Reckless self-dmg: -${selfDmg} HP!`, "red");
+          }
+        }
+      } else if (skill.id === "execute") {
+        // ── Berserker：Execute 处决 ──
+        const monster = state.currentMonster;
+        if (monster) {
+          const isLowHp = monster.currentHp / monster.maxHp < (e.executeThresh || 0.25);
+          const execMult = isLowHp ? (e.executeDmgMult || 4.0) : (e.normalDmgMult || 1.8);
+          heroAttack({ name: skill.name, dmgMult: execMult, guaranteedCrit: isLowHp });
+          if (isLowHp && window.UI) UI.addLog(`>> [BERSERK] EXECUTE! Low HP target!`, "yellow");
+        }
+      } else if (skill.id === "backstab") {
+        // ── Shadowblade：背刺（中毒时加成）──
+        const poisoned = isPoisoned;
+        const bsMult = poisoned ? (e.backstabPoisonDmg || 3.5) : (e.dmgMult || 2.0);
+        const alwaysCrit = poisoned && effects.backstabAlwaysCrit;
+        heroAttack({ name: skill.name, dmgMult: bsMult, guaranteedCrit: alwaysCrit });
+        if (poisoned && window.UI) UI.addLog(`>> [SHADOW] Backstab vs poisoned target! ${bsMult*100}% ATK!`, "cyan");
+      } else if (skill.id === "smoke_screen") {
+        // ── Shadowblade：烟雾弹（闪避 + 下次必暴）──
+        smokeScreenActive = true;
+        smokeScreenTimer = e.smokeScreenDuration || 3000;
+        smokeScreenNextCrit = false; // 重置，让闪避时再设置
+        if (window.UI) UI.addLog(`>> [SHADOW] Smoke Screen! Dodge all attacks for ${(smokeScreenTimer/1000).toFixed(0)}s!`, "cyan");
+      } else if (skill.id === "shadow_clone") {
+        // ── Shadowblade：影分身激活 ──
+        shadowCloneActive = true;
+        shadowCloneTimer = e.shadowCloneDuration || 6000;
+        if (state.ranger) { state.ranger.shadowCloneActive = true; state.ranger.shadowCloneTimer = shadowCloneTimer; }
+        if (window.UI) UI.addLog(`>> [SHADOW] Shadow Clone active for ${(shadowCloneTimer/1000).toFixed(0)}s! (60% dmg copy)`, "cyan");
+      } else if (skill.id === "assassinate") {
+        // ── Shadowblade：暗杀（无视防御 + 600% ATK + 最大毒层）──
+        heroAttack({ name: skill.name, dmgMult: e.dmgMult || 6.0, defBypass: e.defBypass || 1.0, guaranteedCrit: true });
+        // 施加最大毒层
+        if (e.applyMaxPoison) {
+          isPoisoned = true;
+          poisonTimer = effects.poisonDuration || 3000;
+          if (window.UI) UI.addLog(`>> [SHADOW] Assassinate! Max poison applied!`, "cyan");
+        }
+        // 记录金币加成
+        if (e.assassinateGoldBonus > 0) assassinateNextGoldBonus = true;
+      } else if (skill.id === "kill_shot") {
+        // ── Marksman：终结一击（秒杀或高伤）──
+        const monster = state.currentMonster;
+        if (monster) {
+          const isLowHp = monster.currentHp / monster.maxHp < (e.killShotThresh || 0.3);
+          const ksMult = isLowHp ? (e.killShotDmg || 9.99) : (e.killShotNormalDmg || 2.2);
+          heroAttack({ name: skill.name, dmgMult: ksMult, guaranteedCrit: isLowHp });
+          if (isLowHp && window.UI) UI.addLog(`>> [MARKSMAN] KILL SHOT! Instant kill!`, "yellow");
+        }
       } else if (e.dmgMult) {
         // 伤害技能（普通 + frost_bolt / ignite / inferno / chain_lightning / ball_lightning 等）
         if (e.hits && e.hits > 1) {
@@ -752,6 +1081,7 @@ if (window.UI) {
   function onMonsterDeath() {
     const state = State.get();
     const monster = state.currentMonster;
+    const effects = Skills.getEffects();
     state.stats.totalKills++;
     state.killStreak = (state.killStreak || 0) + 1;
 
@@ -767,6 +1097,18 @@ if (window.UI) {
 
     // 每日任务：击杀计数
     if (window.DailyQuest) DailyQuest.onKill(monster.isElite || false);
+
+    // ── Berserker：击杀时累积怒气 ──
+    if (state.hero.class === "warrior" && state.warrior && effects.rageOnKill > 0) {
+      const maxRage = effects.rageMaxStacks || 10;
+      const prevRage = state.warrior.rageStacks || 0;
+      state.warrior.rageStacks = Math.min(maxRage, prevRage + (effects.rageOnKill || 1));
+      if (window.UI && state.warrior.rageStacks !== prevRage) {
+        UI.addLog(`>> [BERSERK] Rage! ${state.warrior.rageStacks}/${maxRage} stacks (+${Math.round((effects.rageAtkPerStack || 0) * state.warrior.rageStacks * 100)}% ATK)`, "yellow");
+      }
+      // Guardian 反击标记重置（每次击杀后重置，等待下次格挡）
+      if (state.warrior.spec === "guardian") guardianCounterReady = false;
+    }
 
     // Pyro：击杀时触发 Ignite Explosion
     if (state.mage && state.mage.spec === "pyro" && state.mage.burnStack > 0) {
@@ -799,7 +1141,6 @@ if (window.UI) {
     if (window.UI) UI.markSidePanelDirty();
 
     // 战士被动：击杀回血
-    const effects = Skills.getEffects();
     if (effects.regenOnKill > 0) {
       const regen = Math.floor(State.getTotalMaxHp() * effects.regenOnKill);
       state.hero.hp = Math.min(State.getTotalMaxHp(), state.hero.hp + regen);
@@ -904,6 +1245,31 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     // Pyro：死亡时余烬熄灭
     if (state.mage && state.mage.spec === "pyro") {
       state.mage.burnStack = 0;
+    }
+
+    // ── Berserker：死亡时怒气处理 ──
+    if (state.hero.class === "warrior" && state.warrior) {
+      if (effects.ragePersistOnDeath) {
+        // Berserker Mastery：死亡只扣 rageDeathLoss 层
+        const loss = effects.rageDeathLoss || 3;
+        state.warrior.rageStacks = Math.max(0, (state.warrior.rageStacks || 0) - loss);
+        if (window.UI) UI.addLog(`>> [BERSERK] Rage: -${loss} stacks on death (${state.warrior.rageStacks} left)`, "yellow");
+      } else {
+        // 未习得 Mastery：死亡清零怒气
+        state.warrior.rageStacks = 0;
+      }
+      // 重置 Guardian 状态
+      guardianUnbreakableActive = false;
+      guardianUnbreakableTimer = 0;
+    }
+    // ── Ranger Shadowblade 状态重置 ──
+    if (state.hero.class === "ranger") {
+      smokeScreenActive = false;
+      shadowCloneActive = false;
+      if (state.ranger) {
+        state.ranger.shadowMarkStacks = 0;
+        state.ranger.shadowCloneActive = false;
+      }
     }
 
     UI.addLog(`>> You died! Lost ${penalty}g. (HP restored to 30%)`, "red");
@@ -1075,6 +1441,74 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
 
     // ── 各种计时器 ──────────────────────────
 
+    // ── Guardian：眩晕计时（Shield Bash）──
+    if (guardianStunActive) {
+      guardianStunTimer -= delta;
+      if (guardianStunTimer <= 0) {
+        guardianStunActive = false;
+        if (window.UI) UI.addLog(">> [GUARD] Stun ended.", "gray");
+      }
+    }
+
+    // ── Guardian：Provoke 计时 ──
+    if (guardianProvokeActive) {
+      guardianProvokeTimer -= delta;
+      if (guardianProvokeTimer <= 0) {
+        guardianProvokeActive = false;
+        guardianProvokeTimer = 0;
+        if (window.UI) UI.addLog(">> [GUARD] Provoke ended.", "gray");
+        if (window.UI) UI.markSidePanelDirty();
+      }
+    }
+
+    // ── Guardian：Unbreakable 计时 ──
+    if (guardianUnbreakableActive) {
+      guardianUnbreakableTimer -= delta;
+      if (guardianUnbreakableTimer <= 0) {
+        guardianUnbreakableActive = false;
+        guardianUnbreakableTimer = 0;
+        if (window.UI) UI.addLog(">> [GUARD] Unbreakable ended.", "gray");
+        if (window.UI) UI.markSidePanelDirty();
+      }
+    }
+
+    // ── Berserker：War Cry 狂暴计时 ──
+    if (berserkActive) {
+      berserkTimer -= delta;
+      if (berserkTimer <= 0) {
+        berserkActive = false;
+        berserkTimer = 0;
+        if (state.warrior) { state.warrior.berserkActive = false; state.warrior.berserkTimer = 0; }
+        if (window.UI) UI.addLog(">> [BERSERK] Berserk ended. DEF restored.", "gray");
+        if (window.UI) UI.markSidePanelDirty();
+      }
+    }
+
+    // ── Shadowblade：Smoke Screen 计时 ──
+    if (smokeScreenActive) {
+      smokeScreenTimer -= delta;
+      if (smokeScreenTimer <= 0) {
+        smokeScreenActive = false;
+        smokeScreenTimer = 0;
+        // 结束时激活下次必暴（如果还没触发）
+        if (!smokeScreenNextCrit) smokeScreenNextCrit = true;
+        if (window.UI) UI.addLog(">> [SHADOW] Smoke Screen cleared! Next hit: guaranteed crit!", "cyan");
+        if (window.UI) UI.markSidePanelDirty();
+      }
+    }
+
+    // ── Shadowblade：影分身计时 ──
+    if (shadowCloneActive) {
+      shadowCloneTimer -= delta;
+      if (shadowCloneTimer <= 0) {
+        shadowCloneActive = false;
+        shadowCloneTimer = 0;
+        if (state.ranger) { state.ranger.shadowCloneActive = false; state.ranger.shadowCloneTimer = 0; }
+        if (window.UI) UI.addLog(">> [SHADOW] Shadow Clone dispersed.", "gray");
+        if (window.UI) UI.markSidePanelDirty();
+      }
+    }
+
     // 减速计时
     if (monsterSlowed) {
       slowTimer -= delta;
@@ -1196,9 +1630,13 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
       if (poisonTimer <= 0) isPoisoned = false;
     }
 
-    // 英雄攻击计时
+    // 英雄攻击计时（War Cry 狂暴时加速）
     heroTimer += delta;
-    const atkInterval = State.getAtkInterval();
+    let effectiveSpd = State.getTotalSpd();
+    if (berserkActive && effects.berserkSpdBonus) {
+      effectiveSpd += effects.berserkSpdBonus;
+    }
+    const atkInterval = Math.max(200, Math.floor(1000 / effectiveSpd));
     if (heroTimer >= atkInterval) {
       heroTimer -= atkInterval;
       const actives = Skills.getActiveSkills();
@@ -1208,8 +1646,10 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
         const e = s.effect;
         if (e.requireFullCharge && !isFullCharge()) return false;
         if (s.id === "ice_barrier" && iceBarrierHp > 0) return false;
-        // 跳过纯 utility（无 dmgMult 且非伤害类）
-        if (!e.dmgMult && !e.hits && !e.blinkImmune && !e.counterspell && !e.timeWarp
+        // 跳过纯 utility（无 dmgMult 且非伤害类，且非专精主动技能）
+        const isSpecSkill = ["shield_bash","provoke","war_cry","reckless_strike","execute",
+          "backstab","smoke_screen","shadow_clone","assassinate","kill_shot"].includes(s.id);
+        if (!isSpecSkill && !e.dmgMult && !e.hits && !e.blinkImmune && !e.counterspell && !e.timeWarp
             && !e.heatShieldDuration && !e.lightningRodDuration && !e.iceBarrier) return false;
         return true;
       });
@@ -1223,8 +1663,9 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     // 英雄攻击后怪物可能已死亡
     if (!state.currentMonster || state.currentMonster.currentHp <= 0) return;
 
-    // 怪物攻击计时（冰冻时不攻击）
+    // 怪物攻击计时（冰冻时不攻击 + Guardian 眩晕时不攻击）
     if (state.mage && state.mage.frozen) return;
+    if (guardianStunActive) return; // Shield Bash 眩晕期间怪物不攻击
 
     // 减速计算
     let monsterSpdMult = 1;
@@ -1352,6 +1793,21 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     get lightningRodActive() { return lightningRodActive; },
     get lightningRodTimer()  { return lightningRodTimer;  },
     get lightningRodHits()   { return lightningRodHits;   },
+    // Warrior UI 状态暴露
+    get guardianProvokeActive()      { return guardianProvokeActive;      },
+    get guardianProvokeTimer()       { return guardianProvokeTimer;       },
+    get guardianUnbreakableActive()  { return guardianUnbreakableActive;  },
+    get guardianUnbreakableTimer()   { return guardianUnbreakableTimer;   },
+    get guardianStunActive()         { return guardianStunActive;         },
+    get guardianStunTimer()          { return guardianStunTimer;          },
+    get berserkActive()              { return berserkActive;              },
+    get berserkTimer()               { return berserkTimer;               },
+    // Ranger UI 状态暴露
+    get smokeScreenActive()          { return smokeScreenActive;          },
+    get smokeScreenTimer()           { return smokeScreenTimer;           },
+    get shadowCloneActive()          { return shadowCloneActive;          },
+    get shadowCloneTimer()           { return shadowCloneTimer;           },
+    get isPoisoned()                 { return isPoisoned;                 },
   };
 })();
 

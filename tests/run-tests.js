@@ -109,6 +109,7 @@ const testFiles = [
   "test-money-sink.js",
   "test-achievements.js",
   "test-warrior-ranger-spec.js",
+  "test-warrior-ranger-combat.js",
   "test-gemshop.js",
   "test-dailyquest.js",
 ];

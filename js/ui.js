@@ -262,6 +262,90 @@ const UI = (() => {
 
     const lines = [header, autoStr, "  ", monsterLine, heroHpLine];
 
+    // ── 战士专精状态 ──────────────────────────────
+    if (state.warrior && state.hero.class === "warrior" && state.warrior.spec) {
+      const w = state.warrior;
+      const skillEffects = Skills.getEffects();
+      if (w.spec === "guardian") {
+        // 格挡层数
+        const maxBlocks = (skillEffects.blockMaxStacks || 3) + (skillEffects.blockMaxBonus || 0);
+        const blockFilled = w.blockStacks || 0;
+        const blockBar = "[" + "█".repeat(blockFilled) + "░".repeat(Math.max(0, maxBlocks - blockFilled)) + "]";
+        lines.push(`  🛡 BLOCK: ${blockBar} ${blockFilled}/${maxBlocks}`);
+        // Provoke 状态
+        if (window.Combat && Combat.guardianProvokeActive) {
+          const secLeft = (Combat.guardianProvokeTimer / 1000).toFixed(1);
+          lines.push(`  ⚔ PROVOKE: ${secLeft}s  (ATK+40%, take+25%)`);
+        }
+        // Unbreakable 状态
+        if (window.Combat && Combat.guardianUnbreakableActive) {
+          const secLeft = (Combat.guardianUnbreakableTimer / 1000).toFixed(1);
+          lines.push(`  ✦ UNBREAKABLE! ${secLeft}s  (immune!)`);
+        }
+        // 眩晕状态
+        if (window.Combat && Combat.guardianStunActive) {
+          const secLeft = (Combat.guardianStunTimer / 1000).toFixed(1);
+          lines.push(`  💫 STUN: ${secLeft}s remaining`);
+        }
+      } else if (w.spec === "berserker") {
+        // 怒气层数
+        const maxRage = skillEffects.rageMaxStacks || 10;
+        const rageFilled = w.rageStacks || 0;
+        const BAR_LEN = 10;
+        const rageFill = Math.round((rageFilled / maxRage) * BAR_LEN);
+        const rageBar = "[" + "█".repeat(rageFill) + "░".repeat(BAR_LEN - rageFill) + "]";
+        const atkBonus = skillEffects.rageAtkPerStack > 0 ? `+${Math.round(rageFilled * skillEffects.rageAtkPerStack * 100)}%ATK` : "";
+        lines.push(`  😡 RAGE : ${rageBar} ${rageFilled}/${maxRage}${atkBonus ? " " + atkBonus : ""}`);
+        // War Cry 狂暴状态
+        if (window.Combat && Combat.berserkActive) {
+          const secLeft = (Combat.berserkTimer / 1000).toFixed(1);
+          lines.push(`  ⚡ BERSERK! ${secLeft}s  (ATK+50% SPD+0.5)`);
+        }
+      }
+    }
+
+    // ── 游侠专精状态 ──────────────────────────────
+    if (state.ranger && state.hero.class === "ranger" && state.ranger.spec) {
+      const r = state.ranger;
+      const skillEffects = Skills.getEffects();
+      if (r.spec === "marksman") {
+        // 连续暴击计数（Ace Shot）
+        if (skillEffects.aceShot) {
+          const aceFilled = r.aceConsecutiveCrits || 0;
+          const aceCount = skillEffects.aceShotCount || 5;
+          const BAR_LEN = aceCount;
+          const aceBar = "[" + "★".repeat(Math.min(aceFilled, BAR_LEN)) + "☆".repeat(Math.max(0, BAR_LEN - aceFilled)) + "]";
+          const aceReady = aceFilled >= aceCount;
+          lines.push(`  🎯 ACE  : ${aceBar} ${aceFilled}/${aceCount}${aceReady ? " *** READY! ***" : ""}`);
+        }
+        // 毒效果
+        if (window.Combat && Combat.isPoisoned) {
+          lines.push(`  ☠ POISON: active`);
+        }
+      } else if (r.spec === "shadowblade") {
+        // 暗影印记层数
+        const maxMark = skillEffects.shadowMarkMaxStacks || 3;
+        const markFilled = r.shadowMarkStacks || 0;
+        const markBar = "[" + "◆".repeat(markFilled) + "◇".repeat(maxMark - markFilled) + "]";
+        const markBonus = skillEffects.shadowMarkDmgBonus > 0 ? `+${Math.round(markFilled * skillEffects.shadowMarkDmgBonus * 100)}%DMG` : "";
+        lines.push(`  🌑 MARK : ${markBar} ${markFilled}/${maxMark}${markBonus ? " " + markBonus : ""}`);
+        // 毒效果
+        if (window.Combat && Combat.isPoisoned) {
+          lines.push(`  ☠ POISON: active`);
+        }
+        // Smoke Screen 状态
+        if (window.Combat && Combat.smokeScreenActive) {
+          const secLeft = (Combat.smokeScreenTimer / 1000).toFixed(1);
+          lines.push(`  💨 SMOKE : ${secLeft}s  (dodge all!)`);
+        }
+        // Shadow Clone 状态
+        if (window.Combat && Combat.shadowCloneActive) {
+          const secLeft = (Combat.shadowCloneTimer / 1000).toFixed(1);
+          lines.push(`  👥 CLONE : ${secLeft}s  (60% echo)`);
+        }
+      }
+    }
+
     // ── 法师专精状态 ──────────────────────────────
     if (state.mage && state.hero.class === "mage") {
       const m = state.mage;
@@ -361,8 +445,29 @@ const UI = (() => {
       const span = document.createElement("span");
       span.textContent = line + (i < lines.length - 1 ? "\n" : "");
 
-      if (line.includes("⚡") || line.includes("CHG") || line.includes("ROD")) {
-        span.style.color = line.includes("FULL") ? COLOR_MAP.yellow : COLOR_MAP.cyan;
+      if (line.includes("⚡") || line.includes("CHG") || line.includes("ROD") || line.includes("BERSERK")) {
+        span.style.color = (line.includes("FULL") || line.includes("BERSERK")) ? COLOR_MAP.yellow : COLOR_MAP.cyan;
+      } else if (line.includes("😡") || line.includes("RAGE")) {
+        span.style.color = COLOR_MAP.red;
+      } else if (line.includes("UNBREAKABLE")) {
+        span.style.color = COLOR_MAP.yellow;
+        span.style.fontWeight = "bold";
+      } else if (line.includes("⚔") || line.includes("PROVOKE")) {
+        span.style.color = COLOR_MAP.yellow;
+      } else if (line.includes("🛡 BLOCK") || line.includes("BLOCK:")) {
+        span.style.color = COLOR_MAP.cyan;
+      } else if (line.includes("💫") || line.includes("STUN")) {
+        span.style.color = COLOR_MAP.cyan;
+      } else if (line.includes("🎯") || line.includes("ACE")) {
+        span.style.color = line.includes("READY") ? COLOR_MAP.yellow : COLOR_MAP.cyan;
+      } else if (line.includes("🌑") || line.includes("MARK :")) {
+        span.style.color = "#bb88ff";
+      } else if (line.includes("☠") || line.includes("POISON")) {
+        span.style.color = "#88ff88";
+      } else if (line.includes("💨") || line.includes("SMOKE")) {
+        span.style.color = COLOR_MAP.gray;
+      } else if (line.includes("👥") || line.includes("CLONE")) {
+        span.style.color = "#bb88ff";
       } else if (line.includes("🔥") || line.includes("BURN")) {
         // 接近满层时显示黄色警告，满层时红色加粗
         if (line.includes("INFERNO NOW")) {
