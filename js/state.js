@@ -101,7 +101,16 @@ const State = (() => {
         totalDmgDealt: 0,
         totalGoldEarned: 0,
         bossesDefeated: 0,
+        eliteKills: 0,          // 精英怪击杀数
+        maxKillStreak: 0,       // 历史最高连胜
+        deaths: 0,              // 死亡次数
       },
+
+      // 材料收集（{ materialId: count }）
+      materials: {},
+
+      // 成就解锁状态（{ achievementId: { unlockedAt } }）
+      achievements: {},
 
       // 属性训练次数（金币消耗系统）
       training: {

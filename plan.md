@@ -224,6 +224,14 @@ incremental/
   - **技能总览面板**：Stats 面板底部新增 `── SKILLS LEARNED ──` 区域，分 `[Active]`（⚡黄色，显示CD和MP消耗）和 `[Passive]`（✦青色，显示描述）两类列出已解锁技能；`skills.js` 新增 `getPassiveSkills()` 函数
   - **测试**：修复 `test-regen.js`（全面更新至新公式，28项）、`test-state.js`（2项 HPR/MPR 基础值断言）、`test-equipment.js`（iron_sword/shadow_blade ATK值）、`test-monsters-zones.js`（高等级怪物测试改用跨区域对比）；新增 `test-new-features.js`（37项，覆盖 calcEffectiveLevel/MUTATION_POOL完整性/精英怪触发/各新词缀/passiveStatMult/getPassiveSkills/resetRegenAccumulators）；总计 **458 通过，0 失败**
 
+- [x] 成就系统 + 材料追踪 + 背包改进（v0.13.0）：
+  - **成就系统**：新建 `js/achievements.js`，定义 20+ 个成就（击杀里程碑/等级/Boss 击败/金币/连胜/装备/转生/精英怪），`Achievements.check()` 在每次击杀后自动检查，首次解锁时发放 Gems 奖励并推送 `[LOOT]` 日志；`renderHero` 左侧面板显示成就解锁进度摘要（`ACHIEV: X/Y`）；`Stats` 面板新增 `── ACHIEVEMENTS ──` 区块，已解锁用黄色图标+名称+描述展示，未解锁用灰色 `▸` 显示；`index.html` 引入 `js/achievements.js`（在 blackmarket.js 之后、ui.js 之前）
+  - **扩展统计追踪**：`state.stats` 新增 `eliteKills`（精英击杀数）、`maxKillStreak`（历史最高连胜）、`deaths`（死亡次数）三项；`combat.js` `onMonsterDeath` 更新 `maxKillStreak` 和 `eliteKills`，`onHeroDeath` 更新 `deaths` 并重置 `killStreak`；`Stats` 面板新增显示 `Elite Kills`/`Best Streak`/`Deaths` 三行
+  - **连胜显示**：左侧英雄面板当 `killStreak > 0` 时显示 `STREAK: N kills` 行，≥5 次显示 🔥，≥20 次双🔥，≥50 次三🔥
+  - **材料收集系统**：`state.materials` 对象正确追踪各材料数量（`materials[id] = count`）；`combat.js` 掉落逻辑中 `dropType === "material"` 时累加计数并在日志显示当前总数；背包 ITEMS 面板底部新增 `── MATERIALS ──` 区块，列出所有已收集材料名称和数量（snake_case 自动转换为 Title Case 可读名）
+  - **背包改进**：装备列表按品质降序排序（legendary > epic > rare > common）；背包标题显示各品质数量统计（如 `[L:1 E:2 R:3 C:5]`）；当背包含有 common/rare 装备时显示 `[Sell All Common]` / `[Sell All Rare]` 一键批量出售按钮，点击后出售同品质所有装备并汇报总金币
+  - **测试**：新增 `tests/test-achievements.js`（33 项测试），覆盖成就解锁条件/不重复解锁/gem 奖励/材料追踪计数/连胜统计字段/背包排序逻辑/bossDefeated 条件；`run-tests.js` 引入新测试文件；总计 **539 通过，0 失败**
+
 ---
 
 ## 待定问题（请修订）

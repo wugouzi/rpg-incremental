@@ -105,6 +105,7 @@ const testFiles = [
   "test-pyro-ui.js",
   "test-new-features.js",
   "test-money-sink.js",
+  "test-achievements.js",
 ];
 
 console.log(gr("Running tests...\n"));

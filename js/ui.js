@@ -206,6 +206,20 @@ const UI = (() => {
       lines.push(`  ATK BONUS: x${h.prestigeBonus.toFixed(2)}`);
     }
 
+    // 连胜显示
+    const streak = state.killStreak || 0;
+    if (streak > 0) {
+      const streakIcon = streak >= 50 ? "🔥🔥🔥" : streak >= 20 ? "🔥🔥" : streak >= 5 ? "🔥" : "";
+      lines.push(`  `);
+      lines.push(`  STREAK : ${streak} kills${streakIcon}`);
+    }
+
+    // 成就进度（小摘要）
+    if (window.Achievements) {
+      const achProg = Achievements.getProgress();
+      lines.push(`  ACHIEV : ${achProg.unlocked}/${achProg.total}`);
+    }
+
     // 黑市 buff 状态显示
     const buffs = state.buffs || {};
     const activeBuffs = [];
@@ -473,9 +487,12 @@ const UI = (() => {
       "",
       "  ── STATISTICS ─────────────────────",
       `  Total Kills  : ${Utils.formatNum(state.stats.totalKills)}`,
+      `  Elite Kills  : ${Utils.formatNum(state.stats.eliteKills || 0)}`,
       `  Total Dmg    : ${Utils.formatNum(state.stats.totalDmgDealt)}`,
       `  Gold Earned  : ${Utils.formatNum(state.stats.totalGoldEarned)}`,
       `  Bosses Slain : ${state.stats.bossesDefeated}`,
+      `  Best Streak  : ${state.stats.maxKillStreak || 0}`,
+      `  Deaths       : ${state.stats.deaths || 0}`,
     ];
 
     // ── 技能总览 ──────────────────────────────
@@ -550,8 +567,42 @@ const UI = (() => {
 
     el.appendChild(pre);
 
+    // ── 成就列表 ──────────────────────────────
+    _renderAchievements(el, state);
+
     // ── 属性训练区（带按钮，用 DOM 节点单独渲染）──
     _renderTrainingSection(el, state);
+  }
+
+  /**
+   * 在 Stats 面板中渲染成就列表
+   */
+  function _renderAchievements(el, state) {
+    if (!window.Achievements) return;
+    const all = Achievements.getAll();
+    const prog = Achievements.getProgress();
+
+    const header = document.createElement("div");
+    header.textContent = `\n  ── ACHIEVEMENTS (${prog.unlocked}/${prog.total}) ────────`;
+    header.style.color = COLOR_MAP.white;
+    el.appendChild(header);
+
+    all.forEach(ach => {
+      const row = document.createElement("div");
+      row.style.marginTop = "2px";
+
+      if (ach.unlocked) {
+        row.innerHTML = `<span style="color:${COLOR_MAP.yellow}">  ${ach.icon} ${ach.name}</span>` +
+          `<span style="color:${COLOR_MAP.gray};font-size:0.85em">  — ${ach.desc}</span>`;
+        if (ach.reward.gems > 0) {
+          row.innerHTML += `<span style="color:${COLOR_MAP.cyan}"> (+${ach.reward.gems}💎)</span>`;
+        }
+      } else {
+        row.innerHTML = `<span style="color:${COLOR_MAP.gray}">  ▸ ${ach.name}</span>` +
+          `<span style="color:#444;font-size:0.85em">  — ${ach.desc}</span>`;
+      }
+      el.appendChild(row);
+    });
   }
 
   /**
@@ -614,12 +665,15 @@ const UI = (() => {
   // Inventory 面板
   // ─────────────────────────────────────────
 
+  // 品质排序权重（数字越大越靠前）
+  const RARITY_SORT = { legendary: 4, epic: 3, rare: 2, common: 1 };
+
   function renderInventory() {
     const state = State.get();
     const el = document.getElementById("side-panel");
     el.innerHTML = "";
 
-    // 装备槽
+    // ── 装备槽 ────────────────────────────────────────────
     const slots = ["weapon", "helmet", "chest", "legs", "ring", "neck"];
     const slotLabels = { weapon: "Weapon", helmet: "Helmet", chest: "Chest", legs: "Legs", ring: "Ring", neck: "Neck" };
 
@@ -673,20 +727,63 @@ const UI = (() => {
       el.appendChild(row);
     });
 
-    // 背包
+    // ── 背包（装备类） ────────────────────────────────────
+    // 按品质降序排序（legendary → common）
+    const sortedInv = [...state.inventory].sort((a, b) =>
+      (RARITY_SORT[b.rarity] || 1) - (RARITY_SORT[a.rarity] || 1)
+    );
+
+    // 统计各品质数量
+    const rarityCounts = { common: 0, rare: 0, epic: 0, legendary: 0 };
+    sortedInv.forEach(i => { rarityCounts[i.rarity] = (rarityCounts[i.rarity] || 0) + 1; });
+    const rarityInfo = Object.entries(rarityCounts)
+      .filter(([, c]) => c > 0)
+      .map(([r, c]) => `${r[0].toUpperCase()}:${c}`)
+      .join(" ");
+
     const invHeader = document.createElement("div");
     invHeader.style.marginTop = "8px";
-    invHeader.textContent = `  ── BACKPACK (${state.inventory.length}/20) ──────────────`;
+    invHeader.textContent = `  ── BACKPACK (${state.inventory.length}/20) ${rarityInfo ? "  [" + rarityInfo + "]" : ""} ──`;
     invHeader.style.color = COLOR_MAP.white;
     el.appendChild(invHeader);
 
-    if (state.inventory.length === 0) {
+    // 一键出售按钮行（出售全部 common / 出售 common+rare）
+    if (state.inventory.length > 0) {
+      const bulkRow = document.createElement("div");
+      bulkRow.style.display = "flex";
+      bulkRow.style.gap = "6px";
+      bulkRow.style.marginBottom = "4px";
+
+      const hasCommon = sortedInv.some(i => i.rarity === "common");
+      const hasRare   = sortedInv.some(i => i.rarity === "rare");
+
+      if (hasCommon) {
+        const btnSellCommon = document.createElement("span");
+        btnSellCommon.textContent = "  [Sell All Common]";
+        btnSellCommon.className = "btn btn-sell";
+        btnSellCommon.dataset.action = "sellBulk";
+        btnSellCommon.dataset.rarity = "common";
+        bulkRow.appendChild(btnSellCommon);
+      }
+      if (hasRare) {
+        const btnSellRare = document.createElement("span");
+        btnSellRare.textContent = "[Sell All Rare]";
+        btnSellRare.className = "btn btn-sell";
+        btnSellRare.dataset.action = "sellBulk";
+        btnSellRare.dataset.rarity = "rare";
+        bulkRow.appendChild(btnSellRare);
+      }
+
+      if (hasCommon || hasRare) el.appendChild(bulkRow);
+    }
+
+    if (sortedInv.length === 0) {
       const empty = document.createElement("div");
       empty.textContent = "  (empty)";
       empty.style.color = COLOR_MAP.gray;
       el.appendChild(empty);
     } else {
-      state.inventory.forEach((item, idx) => {
+      sortedInv.forEach((item, idx) => {
         const itemColor = COLOR_MAP[Equipment.getRarityColor(item.rarity)] || COLOR_MAP.white;
         const rt = RARITY_TAG[item.rarity] || RARITY_TAG.common;
 
@@ -717,7 +814,7 @@ const UI = (() => {
         btnEnh.dataset.iid = item.instanceId;
         row.appendChild(btnEnh);
 
-          const reforgeCost = window.Equipment ? Equipment.REFORGE_COST[item.rarity] || 500 : 500;
+        const reforgeCost = window.Equipment ? Equipment.REFORGE_COST[item.rarity] || 500 : 500;
         const btnReforge = document.createElement("span");
         btnReforge.textContent = `[Reforge ${Utils.formatNum(reforgeCost)}g]`;
         const canReforge = state.hero.gold >= reforgeCost;
@@ -739,6 +836,34 @@ const UI = (() => {
         const equipped = state.equipment[item.slot] || null;
         _bindTooltip(label, item, equipped);
 
+        el.appendChild(row);
+      });
+    }
+
+    // ── 材料区域 ──────────────────────────────────────────
+    const materials = state.materials || {};
+    const matEntries = Object.entries(materials).filter(([, cnt]) => cnt > 0);
+
+    const matHeader = document.createElement("div");
+    matHeader.style.marginTop = "10px";
+    matHeader.textContent = `  ── MATERIALS (${matEntries.length} types) ───────────────`;
+    matHeader.style.color = COLOR_MAP.white;
+    el.appendChild(matHeader);
+
+    if (matEntries.length === 0) {
+      const empty = document.createElement("div");
+      empty.textContent = "  (no materials collected yet)";
+      empty.style.color = COLOR_MAP.gray;
+      el.appendChild(empty);
+    } else {
+      // 按 ID 排序，方便查看
+      matEntries.sort((a, b) => a[0].localeCompare(b[0]));
+      matEntries.forEach(([matId, cnt]) => {
+        const row = document.createElement("div");
+        // 将 material ID 转换为可读名字（snake_case → Title Case）
+        const matName = matId.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        row.textContent = `  ${matName.padEnd(20)} x${cnt}`;
+        row.style.color = COLOR_MAP.yellow;
         el.appendChild(row);
       });
     }
@@ -1613,6 +1738,19 @@ const UI = (() => {
       case "sell": {
         const item = state.inventory.find(i => String(i.instanceId) === target.dataset.iid);
         if (item) Equipment.sell(item);
+        break;
+      }
+      case "sellBulk": {
+        // 批量出售指定品质的所有背包装备
+        const targetRarity = target.dataset.rarity;
+        const toSell = state.inventory.filter(i => i.rarity === targetRarity);
+        if (toSell.length === 0) break;
+        let totalGold = 0;
+        toSell.forEach(i => {
+          totalGold += i.sellPrice || 0;
+          Equipment.sell(i);
+        });
+        if (window.UI) UI.addLog(`>> [SOLD] ${toSell.length} ${targetRarity} items for ${totalGold}g`, "yellow", "loot");
         break;
       }
       case "reforge": {

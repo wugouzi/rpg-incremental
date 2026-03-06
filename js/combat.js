@@ -755,6 +755,16 @@ if (window.UI) {
     state.stats.totalKills++;
     state.killStreak = (state.killStreak || 0) + 1;
 
+    // 更新历史最高连胜
+    if (state.killStreak > (state.stats.maxKillStreak || 0)) {
+      state.stats.maxKillStreak = state.killStreak;
+    }
+
+    // 精英怪击杀统计
+    if (monster.isElite) {
+      state.stats.eliteKills = (state.stats.eliteKills || 0) + 1;
+    }
+
     // Pyro：击杀时触发 Ignite Explosion
     if (state.mage && state.mage.spec === "pyro" && state.mage.burnStack > 0) {
       const stacks = state.mage.burnStack;
@@ -830,7 +840,10 @@ const item = Equipment.createItem(drop.itemId, true, true, true);
           UI.addLog(`>> [DROP] ${item.name}${affixStr} [${Equipment.getRarityLabel(item.rarity)}]`, rarityColor);
         }
       } else if (dropType === "material") {
-        UI.addLog(`>> [MAT] ${drop.name}`, "gray");
+        // 追踪材料数量
+        if (!state.materials) state.materials = {};
+        state.materials[drop.itemId] = (state.materials[drop.itemId] || 0) + 1;
+        UI.addLog(`>> [MAT] ${drop.name} x1 (total: ${state.materials[drop.itemId]})`, "gray");
 } else {
 // legacy 格式也带随机属性
 const item = Equipment.createItem(drop.itemId, true, true, true);
@@ -846,6 +859,9 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     if (monster.isBoss) {
       onBossDefeated();
     }
+
+    // 成就检查（每次击杀后）
+    if (window.Achievements) Achievements.check();
 
     // Ley Line：连续 3 杀激活
     if (effects.leyLine && state.killStreak >= 3) {
@@ -878,6 +894,7 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     monsterSlowed = false;
     heatShieldActive = false;
     lightningRodActive = false;
+    state.stats.deaths = (state.stats.deaths || 0) + 1;
     state.killStreak = 0; // 死亡重置连胜
     // Pyro：死亡时余烬熄灭
     if (state.mage && state.mage.spec === "pyro") {
