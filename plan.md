@@ -208,6 +208,15 @@ incremental/
 - [x] REST/Regen 双 Bug 修复（v0.9.3）：① `main.js` 非战斗状态不调用 `Combat.tick` 导致 REST 和自然回复完全无效；② `tickRegen` 用 `Math.max(1, Math.round(hpr))` 导致 HPR=0.2 时固定每秒回 1（5×偏快）；③ `tickRegen` 末尾调用不存在的 `UI.markDirty` 导致 UI 不刷新。修复：去掉 `main.js` 的 `currentMonster` 守卫；换用小数累计器（`hpRegenAcc`/`mpRegenAcc`）按 delta/1000 逐 tick 积分；改 `UI.markSidePanelDirty()`；新增 `tests/test-regen.js`（28 项测试，覆盖 HPR/MPR 基础值、小数累计精度、MP 回复、REST 3× 加速、战斗中断），总计 349 通过
 - [x] Hover Tooltip 全面扩展 + 频闪修复（v0.10.0）：① 技能行 hover 显示 tooltip（技能名/类型[主动/被动]/解锁等级/费用/前置条件/效果说明）；② Zone 行 hover 显示 tooltip（区域描述/普通怪物列表[名称+元素+HP/ATK/DEF/EXP]/Boss 信息+状态）；③ 修复装备 tooltip 绑定范围（移到 `label` span，不含操作按钮区域，解决卖掉后 tooltip 残留问题）；④ 修复侧面板重建频闪：`refreshSidePanelIfDirty` 在 tooltip visible 时跳过重建（推迟到鼠标离开后），彻底消除按钮 hover 每秒一次的闪烁；⑤ `tickRegen` 改为仅在 HP/MP 实际整数变化时才标脏，大幅减少不必要的 DOM 重建；⑥ `Skills.getTemplate(id)` 新增暴露，供 ui.js tooltip 查询前置技能名称；测试总计 353 通过（无新增，逻辑变更无测试点）
 - [x] 技能栏精简 + 火焰法师体验强化（v0.10.1）：① 技能栏移除名称行内描述文字（已学/未学均只保留名称+等级+费用），描述仅在 tooltip 内展示；② Pyro 状态栏新增 BURN 层数阶段提示：≥3 层显示橙色 `(≥3 → Inferno!)`，满层显示黄色加粗 `*** INFERNO NOW! ***`；③ Heat Shield 激活时在状态栏实时显示剩余时间和说明；④ Cauterize 激活（burn≥5）时状态栏显示绿色提示 `✦ CAUTERIZE active`；⑤ Ice Barrier（Cryo）激活时显示剩余护盾 HP；⑥ Lightning Rod（Storm）激活时将倒计时和触发次数纳入 buff 行；⑦ `combat.js` 新增 `heatShieldActive/Timer`、`iceBarrierHp`、`lightningRodActive/Timer/Hits` getter 供 UI 读取；⑧ 数值调整：Ignite CD 4s→3s，Inferno 爆炸阈值 5→3，Heat Shield CD 18s→12s；新增 `tests/test-pyro-ui.js`（35 项测试），总计 418 通过
+- [x] 平衡性大修 + 新机制实装（v0.11.0）：
+  - **HP/MP 回复公式升级**：HPR = `1 + level×0.3`（Lv1=1.3, Lv10=4, Lv50=16），MPR = `0.5 + level×0.15`（Lv1=0.65, Lv10=2, Lv50=8），大幅提升中高等级回复量，与 HP/MP 总量成长匹配；`Combat.resetRegenAccumulators()` 新增供测试使用
+  - **Zone 动态怪物等级**：每个 Zone 新增 `levelRange: [min, max]` 和 `killStreakScale`，怪物等级 = `clamp(heroLevel + floor(killStreak × scale), zoneMin, zoneMax)`；Boss 固定使用 zone 最高等级；UI Zone 面板显示当前有效等级和区间
+  - **怪物 Mutation 系统**：新增 `MUTATION_POOL`（8 种词条：Berserker/Armored/Swift/Colossal/Toxic/Volatile/Cursed/Warlord），`tryMutate` 函数按 `5% + killStreak×1%`（上限60%）概率为普通怪附加 1~2 条词缀，精英怪掉落翻倍+金币+50%，战斗日志显示 `⚠ELITE` 标签及词条名称，战斗面板同步显示 `⚠ELITE` 标签
+  - **装备基础属性提升**：全部 `ITEM_TEMPLATES` 基础属性大幅提升（iron_sword ATK 18→28，shadow_blade ATK 110→150 等），使装备效果更明显；HPR/MPR 词缀范围增强；新增武器 HPR 词缀
+  - **新装备词缀**：`skill_cd_reduce`（技能CD减少，上限60%）、`active_boost`（主动技能伤害+%）、`passive_boost`（被动效果倍率放大）、`mp_on_kill`（击杀回复MP）；`state.js` 的 `getEquipBonus()` 新增对应累加逻辑；`skills.js` 的 `getEffects()` 应用 `passiveStatMult` 放大被动加成；`combat.js` 应用 `skillCdReduce`/`activeDmgBonus`/`mpOnKill`
+  - **技能CD栏**：战斗面板下方新增 `── SKILLS ──` 区域，显示所有已解锁主动技能名称、CD进度条（`[████░░░░]`）和剩余时间/READY状态
+  - **技能总览面板**：Stats 面板底部新增 `── SKILLS LEARNED ──` 区域，分 `[Active]`（⚡黄色，显示CD和MP消耗）和 `[Passive]`（✦青色，显示描述）两类列出已解锁技能；`skills.js` 新增 `getPassiveSkills()` 函数
+  - **测试**：修复 `test-regen.js`（全面更新至新公式，28项）、`test-state.js`（2项 HPR/MPR 基础值断言）、`test-equipment.js`（iron_sword/shadow_blade ATK值）、`test-monsters-zones.js`（高等级怪物测试改用跨区域对比）；新增 `test-new-features.js`（37项，覆盖 calcEffectiveLevel/MUTATION_POOL完整性/精英怪触发/各新词缀/passiveStatMult/getPassiveSkills/resetRegenAccumulators）；总计 **458 通过，0 失败**
 
 ---
 

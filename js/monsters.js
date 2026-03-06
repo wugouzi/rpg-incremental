@@ -324,10 +324,32 @@ const Monsters = (() => {
   }
 
   /**
+   * 计算当前区域的有效怪物等级
+   * = clamp(heroLevel, zoneMin, zoneMin + killStreak*scale, zoneMax)
+   * 让连胜推高怪物等级，使区域不会立刻过时
+   */
+  function calcEffectiveLevel(zoneId) {
+    const state   = State.get();
+    const heroLv  = state.hero.level;
+    const killStr = state.killStreak || 0;
+    const zone    = window.Zones ? Zones.getZone(zoneId) : null;
+    if (!zone || !zone.levelRange) return heroLv;
+
+    const [zMin, zMax]  = zone.levelRange;
+    const scale = zone.killStreakScale || 0.5;
+    // 基础：以玩家等级为中心，但不低于区域最低等级
+    const base  = Math.max(zMin, heroLv);
+    // 连胜加成：每连胜提升 scale 级
+    const bonus = Math.floor(killStr * scale);
+    return Math.min(zMax, base + bonus);
+  }
+
+  /**
    * 按权重从指定区域随机选取一只普通怪物并生成实例
+   * 怪物等级由区域等级区间 + 连胜决定
    */
   function spawn(zoneId) {
-    const heroLevel = State.get().hero.level;
+    const effectiveLevel = calcEffectiveLevel(zoneId);
     const pool = TEMPLATES.filter(t => t.zone === zoneId && !t.isBoss);
     if (pool.length === 0) return null;
 
@@ -338,22 +360,155 @@ const Monsters = (() => {
       r -= t.weight;
       if (r <= 0) { chosen = t; break; }
     }
-    return scaleToLevel(chosen, heroLevel);
+    const instance = scaleToLevel(chosen, effectiveLevel);
+    // 尝试触发 Mutation（精英怪）
+    return tryMutate(instance);
   }
 
   /**
-   * 生成区域 Boss 实例
+   * 生成区域 Boss 实例（Boss 等级 = 区域最高等级）
    */
   function spawnBoss(zoneId) {
-    const heroLevel = State.get().hero.level;
     const boss = TEMPLATES.find(t => t.zone === zoneId && t.isBoss);
     if (!boss) return null;
-    const inst = scaleToLevel(boss, heroLevel);
+    // Boss 始终用区域最高等级（保证挑战性）
+    const zone = window.Zones ? Zones.getZone(zoneId) : null;
+    const bossLevel = zone && zone.levelRange
+      ? zone.levelRange[1]
+      : State.get().hero.level;
+    const inst = scaleToLevel(boss, bossLevel);
     // Boss 额外乘以 2 倍
     inst.currentHp *= 2;
     inst.maxHp     *= 2;
     inst.atk       = Math.floor(inst.atk * 1.5);
     return inst;
+  }
+
+  // ─────────────────────────────────────────
+  // Mutation 系统（类 Diablo 精英怪）
+  // ─────────────────────────────────────────
+
+  // 词条池：每个词条包含 id、名称、效果（对怪物实例的修改函数）
+  const MUTATION_POOL = [
+    {
+      id: "berserker",
+      name: "Berserker",
+      color: "red",
+      icon: "⚔",
+      desc: "ATK ×1.5",
+      apply: (m) => { m.atk = Math.floor(m.atk * 1.5); },
+    },
+    {
+      id: "armored",
+      name: "Armored",
+      color: "white",
+      icon: "🛡",
+      desc: "DEF ×2, HP ×1.3",
+      apply: (m) => {
+        m.def   = Math.floor(m.def * 2 + 5);
+        m.maxHp = Math.floor(m.maxHp * 1.3);
+        m.currentHp = m.maxHp;
+      },
+    },
+    {
+      id: "swift",
+      name: "Swift",
+      color: "cyan",
+      icon: "💨",
+      desc: "SPD ×1.5",
+      apply: (m) => { m.spd = m.spd * 1.5; },
+    },
+    {
+      id: "colossal",
+      name: "Colossal",
+      color: "yellow",
+      icon: "⬆",
+      desc: "HP ×2, ATK ×1.2",
+      apply: (m) => {
+        m.maxHp = Math.floor(m.maxHp * 2);
+        m.currentHp = m.maxHp;
+        m.atk   = Math.floor(m.atk * 1.2);
+      },
+    },
+    {
+      id: "toxic",
+      name: "Toxic",
+      color: "green",
+      icon: "☠",
+      desc: "Element becomes Poison",
+      apply: (m) => { m.element = "poison"; m.atk = Math.floor(m.atk * 1.2); },
+    },
+    {
+      id: "volatile",
+      name: "Volatile",
+      color: "red",
+      icon: "💥",
+      desc: "ATK ×1.3, SPD ×1.2",
+      apply: (m) => { m.atk = Math.floor(m.atk * 1.3); m.spd = m.spd * 1.2; },
+    },
+    {
+      id: "cursed",
+      name: "Cursed",
+      color: "yellow",
+      icon: "👁",
+      desc: "HP ×1.5, EXP ×2",
+      apply: (m) => {
+        m.maxHp = Math.floor(m.maxHp * 1.5);
+        m.currentHp = m.maxHp;
+        m.expReward = Math.floor(m.expReward * 2);
+      },
+    },
+    {
+      id: "warlord",
+      name: "Warlord",
+      color: "red",
+      icon: "👑",
+      desc: "ATK ×1.4, DEF ×1.4, HP ×1.4",
+      apply: (m) => {
+        m.atk   = Math.floor(m.atk   * 1.4);
+        m.def   = Math.floor(m.def   * 1.4);
+        m.maxHp = Math.floor(m.maxHp * 1.4);
+        m.currentHp = m.maxHp;
+      },
+    },
+  ];
+
+  /**
+   * 尝试为普通怪物附加 Mutation 词条
+   * 基础概率 5% + 每连胜 +1%（上限 60%）
+   * 精英怪获得 1~2 条词缀，掉落率翻倍
+   */
+  function tryMutate(monster) {
+    const state = State.get();
+    const streak = state.killStreak || 0;
+    // 基础 5% + 每连胜 +1%，上限 60%
+    const chance = Math.min(0.60, 0.05 + streak * 0.01);
+    if (Math.random() >= chance) return monster;
+
+    // 随机抽取 1~2 条词缀（连胜 ≥ 20 有概率 2 条）
+    const mutCount = (streak >= 20 && Math.random() < 0.35) ? 2 : 1;
+    const shuffled = [...MUTATION_POOL].sort(() => Math.random() - 0.5);
+    const picked = shuffled.slice(0, mutCount);
+
+    // 应用词缀
+    picked.forEach(mut => mut.apply(monster));
+
+    // 标记为精英
+    monster.isElite = true;
+    monster.mutations = picked;
+
+    // 精英掉落率翻倍
+    if (monster.dropTable) {
+      monster.dropTable = monster.dropTable.map(d => ({
+        ...d,
+        chance: Math.min(1.0, d.chance * 2),
+      }));
+    }
+    // 金币奖励 +50%
+    monster.goldMin = Math.floor((monster.goldMin || 0) * 1.5);
+    monster.goldMax = Math.floor((monster.goldMax || 0) * 1.5);
+
+    return monster;
   }
 
   /**
@@ -370,7 +525,7 @@ const Monsters = (() => {
     return TEMPLATES.filter(t => t.zone === zoneId);
   }
 
-  return { spawn, spawnBoss, getTemplate, getByZone, TEMPLATES };
+  return { spawn, spawnBoss, getTemplate, getByZone, TEMPLATES, calcEffectiveLevel, MUTATION_POOL };
 })();
 
 window.Monsters = Monsters;

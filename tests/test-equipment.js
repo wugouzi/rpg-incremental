@@ -283,12 +283,12 @@ describe("Equipment.addToInventory", () => {
 
 describe("Equipment.createItem — 随机属性浮动", () => {
   it("商店模式（rollStats=false）：atk 为固定值", () => {
-    // iron_sword 模板 atk=18，common statMult=1.0 → 固定 18
+    // iron_sword 模板 atk=28，common statMult=1.0 → 固定 28
     const item = Equipment.createItem("iron_sword", false, false);
-    assert.equal(item.stats.atk, 18, "商店模式属性应固定");
+    assert.equal(item.stats.atk, 28, "商店模式属性应固定");
   });
 
-  it("掉落模式（rollStats=true）：atk 在 [14, 22] 范围内（18 × ±20%）", () => {
+  it("掉落模式（rollStats=true）：atk 在 [22, 34] 范围内（28 × ±20%）", () => {
     // 多次创建，确保值在范围内且有波动
     let min = Infinity, max = -Infinity;
     for (let i = 0; i < 50; i++) {
@@ -296,9 +296,9 @@ describe("Equipment.createItem — 随机属性浮动", () => {
       min = Math.min(min, item.stats.atk);
       max = Math.max(max, item.stats.atk);
     }
-    // base=18, ±20% → [floor(14.4)=14, ceil(21.6)=22]
-    assert.greaterThan(min, 13, "随机 atk 下限应 >= 14");
-    assert.lessThan(max, 23, "随机 atk 上限应 <= 22");
+    // base=28, ±20% → [floor(22.4)=22, ceil(33.6)=34]
+    assert.greaterThan(min, 21, "随机 atk 下限应 >= 22");
+    assert.lessThan(max, 35, "随机 atk 上限应 <= 34");
   });
 
   it("掉落模式多次创建，值应有差异（概率测试，50次必有不同）", () => {
@@ -320,7 +320,7 @@ describe("Equipment.createItem — 随机属性浮动", () => {
   });
 
   it("epic 品质浮动范围更小（±15%）", () => {
-    // shadow_blade：atk=110, epic statMult=1.3 → base=143, ±15% → [floor(121.55), ceil(164.45)]
+    // shadow_blade：atk=150, epic statMult=1.3 → base=195, ±15% → [floor(165.75), ceil(224.25)]
     let min = Infinity, max = -Infinity;
     for (let i = 0; i < 50; i++) {
       const item = Equipment.createItem("shadow_blade", false, true, false);
@@ -328,7 +328,7 @@ describe("Equipment.createItem — 随机属性浮动", () => {
       max = Math.max(max, item.stats.atk);
     }
     // 范围不应超过 ±20%（比 common 严）
-    const base = Math.floor(110 * 1.30);
+    const base = Math.floor(150 * 1.30);
     assert.greaterThan(min, base * 0.79, "epic atk 下限应 > base×0.79");
     assert.lessThan(max, base * 1.21, "epic atk 上限应 < base×1.21");
   });

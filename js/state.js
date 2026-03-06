@@ -126,6 +126,11 @@ const State = (() => {
       fireRes: 0, iceRes: 0, lightningRes: 0, poisonRes: 0, physRes: 0,
       // 特殊加成（百分比整数）
       dropBonus: 0, goldBonus: 0, expBonus: 0,
+      // 技能强化（新增）
+      skillCdReduce: 0,      // 技能CD减少总和（0~1 小数，如 0.20 = -20%）
+      activeDmgBonus: 0,     // 主动技能伤害加成（百分比整数）
+      passiveStatMult: 0,    // 被动效果倍率加成（小数）
+      mpOnKill: 0,           // 击杀回复 MP
     };
     Object.values(data.equipment).forEach(item => {
       if (!item) return;
@@ -152,7 +157,14 @@ const State = (() => {
       bonus.expBonus     += (s.expBonus     || 0);
       bonus.hpr          += (s.hpr          || 0);
       bonus.mpr          += (s.mpr          || 0);
+      // 技能强化词缀
+      bonus.skillCdReduce   += (s.skillCdReduce   || 0);
+      bonus.activeDmgBonus  += (s.activeDmgBonus  || 0);
+      bonus.passiveStatMult += (s.passiveStatMult  || 0);
+      bonus.mpOnKill        += (s.mpOnKill         || 0);
     });
+    // CD减少上限 60%
+    bonus.skillCdReduce = Math.min(0.60, bonus.skillCdReduce);
     return bonus;
   }
 
@@ -241,23 +253,24 @@ const State = (() => {
 
   /**
    * 获取总 HP 回复速率（点/秒）
-   * 基础值 = level * 0.1（约1级=0.1，50级=5），装备词缀叠加
+   * 基础值 = 1 + level * 0.3（1级=1.3，10级=4，30级=10，50级=16）
+   * 装备词缀、技能叠加
    */
   function getTotalHpr() {
     const eq  = getEquipBonus();
     const sk  = getSkillEffects();
-    const base = data.hero.level * 0.1;
+    const base = 1 + data.hero.level * 0.3;
     return Math.max(0, base + eq.hpr + (sk.hprAdd || 0));
   }
 
   /**
    * 获取总 MP 回复速率（点/秒）
-   * 基础值 = level * 0.05
+   * 基础值 = 0.5 + level * 0.15（1级=0.65，10级=2，30级=5，50级=8）
    */
   function getTotalMpr() {
     const eq  = getEquipBonus();
     const sk  = getSkillEffects();
-    const base = data.hero.level * 0.05;
+    const base = 0.5 + data.hero.level * 0.15;
     return Math.max(0, base + eq.mpr + (sk.mprAdd || 0));
   }
 

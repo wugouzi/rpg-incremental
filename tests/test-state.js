@@ -213,17 +213,18 @@ describe("State.getTotalHpr / getTotalMpr", () => {
     return s;
   }
 
-  it("getTotalHpr 裸装 Lv1 = 0.1 (level * 0.1)", () => {
+  it("getTotalHpr 裸装 Lv1 = 1.3 (1 + level*0.3)", () => {
     setup();
-    // Lv1, 无装备词缀
+    // Lv1: 1 + 1*0.3 = 1.3
     const hpr = State.getTotalHpr();
-    assert.equal(Math.round(hpr * 10) / 10, 0.1, `Lv1 HPR 应为 0.1，得到 ${hpr}`);
+    assert.ok(Math.abs(hpr - 1.3) < 0.001, `Lv1 HPR 应为 1.3，得到 ${hpr}`);
   });
 
-  it("getTotalMpr 裸装 Lv1 = 0.05 (level * 0.05)", () => {
+  it("getTotalMpr 裸装 Lv1 = 0.65 (0.5 + level*0.15)", () => {
     setup();
+    // Lv1: 0.5 + 1*0.15 = 0.65
     const mpr = State.getTotalMpr();
-    assert.equal(Math.round(mpr * 100) / 100, 0.05, `Lv1 MPR 应为 0.05，得到 ${mpr}`);
+    assert.ok(Math.abs(mpr - 0.65) < 0.001, `Lv1 MPR 应为 0.65，得到 ${mpr}`);
   });
 
   it("getTotalHpr 随等级增大", () => {

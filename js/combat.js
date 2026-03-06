@@ -226,7 +226,12 @@ const Combat = (() => {
     }
 
 if (window.UI) {
-  UI.addLog(`>> [${Zones.getZone(state.currentZone).name}] ${monster.name} appears!`, "white", "combat");
+  if (monster.isElite && monster.mutations && monster.mutations.length > 0) {
+    const mutNames = monster.mutations.map(m => `${m.icon}${m.name}`).join(" ");
+    UI.addLog(`>> ⚠ ELITE: ${monster.name} [${mutNames}]`, "yellow", "combat");
+  } else {
+    UI.addLog(`>> [${Zones.getZone(state.currentZone).name}] ${monster.name} appears!`, "white", "combat");
+  }
 }
   }
 
@@ -280,6 +285,14 @@ if (window.UI) {
     // magic skill damage mult（arcane_mastery）
     if (skillEffect && effects.magicDmgMult > 1) {
       rawDmg *= effects.magicDmgMult;
+    }
+
+    // 装备：主动技能伤害加成（activeDmgBonus，百分比整数）
+    if (skillEffect) {
+      const eqBonus = State.getEquipBonus();
+      if (eqBonus.activeDmgBonus > 0) {
+        rawDmg *= (1 + eqBonus.activeDmgBonus / 100);
+      }
     }
 
     // focus：HP > 80% 时技能伤害 +20%
@@ -778,6 +791,13 @@ if (window.UI) {
       UI.addLog(`>> Regeneration: +${regen} HP`, "green");
     }
 
+    // 装备：击杀回复 MP（mpOnKill）
+    const eqBonus = State.getEquipBonus();
+    if (eqBonus.mpOnKill > 0) {
+      const maxMp = State.getTotalMaxMp();
+      state.hero.mp = Math.min(maxMp, state.hero.mp + eqBonus.mpOnKill);
+    }
+
     // 掉落加成
     const dropBonus = State.getTotalDropBonus();
     const goldBonus = State.getTotalGoldBonus();
@@ -1016,10 +1036,11 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
 
     const effects = Skills.getEffects();
 
-    // 更新技能 CD（Time Warp 3x 速）
-    const cdTickRate = (state.mage && state.mage.timeWarpActive)
-      ? delta * (effects.timeWarpCdMult || 3)
-      : delta;
+    // 更新技能 CD（Time Warp 3x 速 + 装备CD减少）
+    const eq = State.getEquipBonus();
+    const cdMultiplier = (1 + (effects.timeWarpCdMult && state.mage && state.mage.timeWarpActive ? (effects.timeWarpCdMult - 1) : 0))
+      * (1 + (eq.skillCdReduce || 0));
+    const cdTickRate = delta * cdMultiplier;
     // focus：HP <= 80% 时 CD 速 +15%
     const focusCdBonus = (effects.focus && state.hero.hp <= State.getTotalMaxHp() * 0.8) ? 1.15 : 1;
     Object.keys(skillCooldowns).forEach(id => {
@@ -1274,6 +1295,12 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     }
   }
 
+  /** 重置 HP/MP 回复小数累计器（供测试使用） */
+  function resetRegenAccumulators() {
+    hpRegenAcc = 0;
+    mpRegenAcc = 0;
+  }
+
   return {
     startFight,
     spawnAndFight,
@@ -1284,6 +1311,7 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     startRest,
     stopRest,
     tick,
+    resetRegenAccumulators,
     calcOfflineGains,
     get skillCooldowns() { return skillCooldowns; },
     get heroTimer() { return heroTimer; },

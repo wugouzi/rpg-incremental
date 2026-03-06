@@ -861,6 +861,24 @@ const Skills = (() => {
       result.critAdd += state.mage.charge * result.chargeCritPerStack;
     }
 
+    // 装备：被动效果倍率加成（passiveStatMult）
+    // 放大来自被动技能贡献的关键数值加成（倍率超出 1.0 的部分）
+    const passiveMult = window.State
+      ? (State.getEquipBonus().passiveStatMult || 0)
+      : 0;
+    if (passiveMult > 0) {
+      // 放大超出基础值的被动加成（乘数中超出 1.0 的部分 × passiveMult）
+      // atkMult: 1.0 是基准，超出部分放大
+      result.atkMult  = 1 + (result.atkMult  - 1) * (1 + passiveMult);
+      result.defMult  = 1 + (result.defMult  - 1) * (1 + passiveMult);
+      result.hpMult   = 1 + (result.hpMult   - 1) * (1 + passiveMult);
+      result.mpMult   = 1 + (result.mpMult   - 1) * (1 + passiveMult);
+      // 加法属性：直接放大
+      result.spdAdd   = result.spdAdd   * (1 + passiveMult);
+      result.critAdd  = result.critAdd  * (1 + passiveMult);
+      result.dodgeAdd = result.dodgeAdd * (1 + passiveMult);
+    }
+
     return result;
   }
 
@@ -875,6 +893,20 @@ const Skills = (() => {
       if (t.type !== "active") return false;
       if (!state.unlockedSkills[t.id]) return false;
       // 有专精标签的技能：只在匹配专精时生效
+      if (t.spec && t.spec !== spec) return false;
+      return true;
+    });
+  }
+
+  /**
+   * 返回已解锁的被动技能列表
+   */
+  function getPassiveSkills() {
+    const state = State.get();
+    const spec = state.mage ? state.mage.spec : null;
+    return SKILL_TEMPLATES.filter(t => {
+      if (t.type !== "passive") return false;
+      if (!state.unlockedSkills[t.id]) return false;
       if (t.spec && t.spec !== spec) return false;
       return true;
     });
@@ -926,6 +958,7 @@ const Skills = (() => {
     unlock,
     getEffects,
     getActiveSkills,
+    getPassiveSkills,
     getByClass,
     chooseClass,
     getTemplate,

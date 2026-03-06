@@ -102,6 +102,7 @@ const testFiles = [
   "test-regen.js",
   "test-ui-dirty.js",
   "test-pyro-ui.js",
+  "test-new-features.js",
 ];
 
 console.log(gr("Running tests...\n"));

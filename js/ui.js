@@ -220,7 +220,8 @@ const UI = (() => {
     let monsterLine;
     if (monster && monster.currentHp > 0) {
       const elemTag = monster.element ? ` [${monster.element.toUpperCase()}]` : "";
-      monsterLine = `  MOB : ${monster.name}${elemTag}\n  HP  : ${Utils.formatBar(monster.currentHp, monster.maxHp, 12)} ${monster.currentHp}/${monster.maxHp}`;
+      const eliteTag = monster.isElite ? " ⚠ELITE" : "";
+      monsterLine = `  MOB : ${monster.name}${elemTag}${eliteTag}\n  HP  : ${Utils.formatBar(monster.currentHp, monster.maxHp, 12)} ${monster.currentHp}/${monster.maxHp}`;
     } else {
       monsterLine = `  MOB : -- idle --`;
     }
@@ -294,6 +295,28 @@ const UI = (() => {
       }
       if (buffParts.length > 0) {
         lines.push(`  ✦ ${buffParts.join(" | ")}`);
+      }
+    }
+
+    // ── 技能 CD 栏 ──────────────────────────────
+    // 显示所有已解锁主动技能及其当前 CD 进度
+    if (window.Skills && window.Combat) {
+      const activeSkills = Skills.getActiveSkills();
+      if (activeSkills.length > 0) {
+        lines.push("  ");
+        lines.push("  ── SKILLS ──────────────────────────────");
+        const cds = Combat.skillCooldowns;
+        activeSkills.forEach(skill => {
+          const cdTotal = skill.effect.cd || 5000;
+          const cdLeft  = cds[skill.id] || 0;
+          const cdPct   = cdLeft > 0 ? cdLeft / cdTotal : 0;
+          const BAR_LEN = 8;
+          const filled  = Math.round((1 - cdPct) * BAR_LEN);
+          const bar     = "[" + "█".repeat(filled) + "░".repeat(BAR_LEN - filled) + "]";
+          const cdSec   = (cdLeft / 1000).toFixed(1);
+          const status  = cdLeft > 0 ? `${cdSec}s` : "READY";
+          lines.push(`  ${skill.name.padEnd(16)} ${bar} ${status.padStart(5)}`);
+        });
       }
     }
 
@@ -441,6 +464,30 @@ const UI = (() => {
       `  Bosses Slain : ${state.stats.bossesDefeated}`,
     ];
 
+    // ── 技能总览 ──────────────────────────────
+    if (window.Skills) {
+      const activeSkills  = Skills.getActiveSkills();
+      const passiveSkills = Skills.getPassiveSkills();
+      if (activeSkills.length > 0 || passiveSkills.length > 0) {
+        lines.push("");
+        lines.push("  ── SKILLS LEARNED ──────────────────");
+        if (activeSkills.length > 0) {
+          lines.push("  [Active]");
+          activeSkills.forEach(sk => {
+            const cdSec = sk.effect.cd ? (sk.effect.cd / 1000).toFixed(0) + "s" : "--";
+            const mpCost = sk.effect.mpCost ? `${sk.effect.mpCost}MP` : "free";
+            lines.push(`  ⚡ ${sk.name.padEnd(16)} CD:${cdSec.padStart(4)}  Cost:${mpCost}`);
+          });
+        }
+        if (passiveSkills.length > 0) {
+          lines.push("  [Passive]");
+          passiveSkills.forEach(sk => {
+            lines.push(`  ✦ ${sk.name.padEnd(16)} ${sk.description}`);
+          });
+        }
+      }
+    }
+
     el.innerHTML = "";
     const pre = document.createElement("pre");
     pre.style.margin = "0";
@@ -453,6 +500,18 @@ const UI = (() => {
 
       // 区块标题用白色
       if (line.includes("──")) {
+        span.style.color = COLOR_MAP.white;
+      }
+      // 主动技能行（⚡）
+      else if (line.includes("⚡")) {
+        span.style.color = COLOR_MAP.yellow;
+      }
+      // 被动技能行（✦）
+      else if (line.includes("✦")) {
+        span.style.color = COLOR_MAP.cyan;
+      }
+      // 技能分类标签
+      else if (line.match(/^\s+\[Active\]|\[Passive\]/)) {
         span.style.color = COLOR_MAP.white;
       }
       // 抗性行：非零时用青色，零时用灰色
@@ -1296,6 +1355,17 @@ const UI = (() => {
       descLine.textContent = `  ${zone.description}`;
       descLine.style.color = COLOR_MAP.gray;
       row.appendChild(descLine);
+
+      // 显示等级区间和当前有效怪物等级
+      if (unlocked && zone.levelRange) {
+        const [zMin, zMax] = zone.levelRange;
+        const effLv = window.Monsters ? Monsters.calcEffectiveLevel(zone.id) : state.hero.level;
+        const streak = state.killStreak || 0;
+        const levelLine = document.createElement("div");
+        levelLine.textContent = `  Mob Lv: ${effLv} (range ${zMin}–${zMax}, streak ×${zone.killStreakScale})`;
+        levelLine.style.color = effLv >= zMax ? COLOR_MAP.yellow : COLOR_MAP.cyan;
+        row.appendChild(levelLine);
+      }
 
       if (unlocked) {
         const btnRow = document.createElement("div");

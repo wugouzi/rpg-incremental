@@ -103,12 +103,17 @@ const Equipment = (() => {
     {
       id: "bonus_hpr",       name: "of Recovery",
       slots: ["helmet", "chest", "legs", "ring", "neck"],
-      stat: "hpr",           range: [1, 8],          // HP/s
+      stat: "hpr",           range: [3, 20],         // HP/s (提升范围)
     },
     {
       id: "bonus_mpr",       name: "of Clarity",
       slots: ["helmet", "ring", "neck"],
-      stat: "mpr",           range: [1, 5],          // MP/s
+      stat: "mpr",           range: [2, 10],         // MP/s (提升范围)
+    },
+    {
+      id: "bonus_hpr_weapon", name: "Bloodthirsty",
+      slots: ["weapon"],
+      stat: "hpr",           range: [2, 12],         // 武器也可以有回血
     },
 
     // ── 特殊效果词缀 ─────────────────────────
@@ -127,77 +132,99 @@ const Equipment = (() => {
       slots: ["helmet", "neck", "ring"],
       stat: "expBonus",      range: [3, 12],         // 百分比整数：提升经验收益
     },
+
+    // ── 技能强化词缀 ─────────────────────────
+    {
+      id: "skill_cd_reduce",  name: "Quickened",
+      slots: ["weapon", "ring", "neck"],
+      stat: "skillCdReduce",  range: [0.05, 0.20],   // 技能CD减少 5%~20%（float）
+    },
+    {
+      id: "active_boost",    name: "Empowered",
+      slots: ["weapon", "neck"],
+      stat: "activeDmgBonus", range: [5, 25],        // 主动技能伤害 +5%~+25%
+    },
+    {
+      id: "passive_boost",   name: "Ascendant",
+      slots: ["chest", "legs", "helmet"],
+      stat: "passiveStatMult", range: [0.05, 0.15],  // 被动技能效果倍率 +5%~+15%（float）
+    },
+    {
+      id: "mp_on_kill",      name: "Siphoning",
+      slots: ["weapon", "ring"],
+      stat: "mpOnKill",      range: [5, 20],         // 每次击杀回复 MP
+    },
   ];
 
   // 快速按 stat 类型判断是否为 float 类型
-  const FLOAT_STATS = new Set(["spd", "crit"]);
+  const FLOAT_STATS = new Set(["spd", "crit", "skillCdReduce", "passiveStatMult"]);
 
-  // 装备模板定义
+  // 装备模板定义（基础属性大幅提升，使装备效果更明显）
   // buyPrice: 0 = 只能掉落，不能购买
   const ITEM_TEMPLATES = [
     // ── 武器 ─────────────────────────────────
     { id: "wooden_sword",   name: "Wooden Sword",   slot: "weapon", rarity: "common",
-      stats: { atk: 8 },  buyPrice: 30,  sellPrice: 8,   zone: "plains" },
+      stats: { atk: 12, hpr: 1 },  buyPrice: 30,  sellPrice: 8,   zone: "plains" },
     { id: "iron_sword",     name: "Iron Sword",     slot: "weapon", rarity: "common",
-      stats: { atk: 18 }, buyPrice: 80,  sellPrice: 20,  zone: "forest" },
+      stats: { atk: 28, hpr: 2 }, buyPrice: 80,  sellPrice: 20,  zone: "forest" },
     { id: "steel_sword",    name: "Steel Sword",    slot: "weapon", rarity: "rare",
-      stats: { atk: 38 }, buyPrice: 200, sellPrice: 50,  zone: "cave"   },
+      stats: { atk: 55, hpr: 4 }, buyPrice: 200, sellPrice: 50,  zone: "cave"   },
     { id: "desert_blade",   name: "Desert Blade",   slot: "weapon", rarity: "rare",
-      stats: { atk: 65 }, buyPrice: 500, sellPrice: 120, zone: "desert" },
+      stats: { atk: 90, hpr: 6 }, buyPrice: 500, sellPrice: 120, zone: "desert" },
     { id: "shadow_blade",   name: "Shadow Blade",   slot: "weapon", rarity: "epic",
-      stats: { atk: 110, crit: 0.05 }, buyPrice: 1200, sellPrice: 300, zone: "castle" },
+      stats: { atk: 150, crit: 0.05, hpr: 10 }, buyPrice: 1200, sellPrice: 300, zone: "castle" },
     { id: "lords_sword",    name: "Lord's Sword",   slot: "weapon", rarity: "legendary",
-      stats: { atk: 200, crit: 0.1 },  buyPrice: 0,    sellPrice: 600, zone: "castle" },
+      stats: { atk: 280, crit: 0.1, hpr: 20 },  buyPrice: 0,    sellPrice: 600, zone: "castle" },
 
     // ── 头盔 ─────────────────────────────────
     { id: "leather_cap",    name: "Leather Cap",    slot: "helmet", rarity: "common",
-      stats: { def: 3, hp: 5 }, buyPrice: 20, sellPrice: 5, zone: "plains" },
+      stats: { def: 5, hp: 20, hpr: 1 }, buyPrice: 20, sellPrice: 5, zone: "plains" },
     { id: "iron_helmet",    name: "Iron Helmet",    slot: "helmet", rarity: "common",
-      stats: { def: 8, hp: 10 }, buyPrice: 60, sellPrice: 15, zone: "forest" },
+      stats: { def: 12, hp: 35, hpr: 2 }, buyPrice: 60, sellPrice: 15, zone: "forest" },
     { id: "steel_helmet",   name: "Steel Helmet",   slot: "helmet", rarity: "rare",
-      stats: { def: 18, hp: 25 }, buyPrice: 180, sellPrice: 45, zone: "cave" },
+      stats: { def: 25, hp: 60, hpr: 4 }, buyPrice: 180, sellPrice: 45, zone: "cave" },
     { id: "desert_hood",    name: "Desert Hood",    slot: "helmet", rarity: "rare",
-      stats: { def: 30, hp: 40, spd: 0.1 }, buyPrice: 450, sellPrice: 110, zone: "desert" },
+      stats: { def: 42, hp: 80, spd: 0.1, hpr: 6 }, buyPrice: 450, sellPrice: 110, zone: "desert" },
     { id: "shadow_helm",    name: "Shadow Helm",    slot: "helmet", rarity: "epic",
-      stats: { def: 55, hp: 80 }, buyPrice: 1000, sellPrice: 250, zone: "castle" },
+      stats: { def: 75, hp: 150, hpr: 12 }, buyPrice: 1000, sellPrice: 250, zone: "castle" },
 
     // ── 胸甲 ─────────────────────────────────
     { id: "leather_armor",  name: "Leather Armor",  slot: "chest",  rarity: "common",
-      stats: { def: 5, hp: 10 }, buyPrice: 40, sellPrice: 10, zone: "plains" },
+      stats: { def: 8, hp: 30, hpr: 2 }, buyPrice: 40, sellPrice: 10, zone: "plains" },
     { id: "iron_armor",     name: "Iron Armor",     slot: "chest",  rarity: "common",
-      stats: { def: 13, hp: 20 }, buyPrice: 100, sellPrice: 25, zone: "forest" },
+      stats: { def: 20, hp: 55, hpr: 3 }, buyPrice: 100, sellPrice: 25, zone: "forest" },
     { id: "steel_armor",    name: "Steel Armor",    slot: "chest",  rarity: "rare",
-      stats: { def: 28, hp: 40 }, buyPrice: 250, sellPrice: 62, zone: "cave" },
+      stats: { def: 40, hp: 90, hpr: 6 }, buyPrice: 250, sellPrice: 62, zone: "cave" },
     { id: "desert_robe",    name: "Desert Robe",    slot: "chest",  rarity: "rare",
-      stats: { def: 42, hp: 60, mp: 20 }, buyPrice: 600, sellPrice: 150, zone: "desert" },
+      stats: { def: 58, hp: 110, mp: 30, hpr: 8, mpr: 3 }, buyPrice: 600, sellPrice: 150, zone: "desert" },
     { id: "obsidian_armor", name: "Obsidian Armor", slot: "chest",  rarity: "epic",
-      stats: { def: 70, hp: 100 }, buyPrice: 1000, sellPrice: 250, zone: "castle" },
+      stats: { def: 100, hp: 200, hpr: 16 }, buyPrice: 1000, sellPrice: 250, zone: "castle" },
 
     // ── 腿甲 ─────────────────────────────────
     { id: "leather_legs",   name: "Leather Leggings", slot: "legs", rarity: "common",
-      stats: { def: 3, hp: 8 }, buyPrice: 25, sellPrice: 6, zone: "plains" },
+      stats: { def: 5, hp: 25, hpr: 1 }, buyPrice: 25, sellPrice: 6, zone: "plains" },
     { id: "iron_legs",      name: "Iron Leggings",    slot: "legs", rarity: "common",
-      stats: { def: 9, hp: 15 }, buyPrice: 70, sellPrice: 17, zone: "forest" },
+      stats: { def: 14, hp: 45, hpr: 2 }, buyPrice: 70, sellPrice: 17, zone: "forest" },
     { id: "steel_legs",     name: "Steel Leggings",   slot: "legs", rarity: "rare",
-      stats: { def: 20, hp: 30 }, buyPrice: 200, sellPrice: 50, zone: "cave" },
+      stats: { def: 30, hp: 70, hpr: 5 }, buyPrice: 200, sellPrice: 50, zone: "cave" },
     { id: "shadow_legs",    name: "Shadow Leggings",  slot: "legs", rarity: "epic",
-      stats: { def: 45, hp: 70, spd: 0.1 }, buyPrice: 900, sellPrice: 225, zone: "castle" },
+      stats: { def: 65, hp: 130, spd: 0.1, hpr: 10 }, buyPrice: 900, sellPrice: 225, zone: "castle" },
 
     // ── 戒指 ─────────────────────────────────
     { id: "iron_ring",      name: "Iron Ring",      slot: "ring",   rarity: "common",
-      stats: { atk: 5 },  buyPrice: 50, sellPrice: 12, zone: "plains" },
+      stats: { atk: 8, hp: 15 },  buyPrice: 50, sellPrice: 12, zone: "plains" },
     { id: "magic_ring",     name: "Magic Ring",     slot: "ring",   rarity: "rare",
-      stats: { crit: 0.05, mp: 15 }, buyPrice: 150, sellPrice: 37, zone: "cave" },
+      stats: { crit: 0.05, mp: 25, mpr: 2 }, buyPrice: 150, sellPrice: 37, zone: "cave" },
     { id: "lords_ring",     name: "Lord's Ring",    slot: "ring",   rarity: "legendary",
-      stats: { atk: 50, crit: 0.08, spd: 0.15 }, buyPrice: 0, sellPrice: 500, zone: "castle" },
+      stats: { atk: 70, crit: 0.08, spd: 0.15, hpr: 8 }, buyPrice: 0, sellPrice: 500, zone: "castle" },
 
     // ── 项链 ─────────────────────────────────
     { id: "bone_necklace",  name: "Bone Necklace",  slot: "neck",   rarity: "common",
-      stats: { hp: 20 }, buyPrice: 60, sellPrice: 15, zone: "cave" },
+      stats: { hp: 40, hpr: 2 }, buyPrice: 60, sellPrice: 15, zone: "cave" },
     { id: "sand_amulet",    name: "Sand Amulet",    slot: "neck",   rarity: "rare",
-      stats: { spd: 0.15, hp: 30 }, buyPrice: 400, sellPrice: 100, zone: "desert" },
+      stats: { spd: 0.15, hp: 60, hpr: 5 }, buyPrice: 400, sellPrice: 100, zone: "desert" },
     { id: "shadow_pendant", name: "Shadow Pendant", slot: "neck",   rarity: "epic",
-      stats: { atk: 40, hp: 60, crit: 0.05 }, buyPrice: 1100, sellPrice: 275, zone: "castle" },
+      stats: { atk: 55, hp: 100, crit: 0.05, hpr: 8 }, buyPrice: 1100, sellPrice: 275, zone: "castle" },
   ];
 
   // 快速按 id 查找模板

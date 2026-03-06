@@ -80,15 +80,20 @@ describe("Monsters.spawn", () => {
     }
   });
 
-  it("高等级玩家生成的怪物更强", () => {
+  it("高等级玩家在后期区域生成更强的怪物", () => {
+    // 注意：由于动态等级系统，怪物等级被限制在区域 levelRange 内
+    // 低等级玩家在 plains → 使用玩家等级（低等级）
+    // 高等级玩家在 castle → 使用区域最高等级（更强）
     State.reset();
     State.get().hero.level = 1;
-    const weak = Monsters.spawn("plains");
+    const weakInPlains = Monsters.spawn("plains");
 
-    State.get().hero.level = 20;
-    const strong = Monsters.spawn("plains");
+    // 解锁 castle 并在 castle 生成怪物
+    State.reset();
+    State.get().hero.level = 50;
+    const strongInCastle = Monsters.spawn("castle");
 
-    assert.greaterThan(strong.currentHp, weak.currentHp, "高等级怪物 HP 应更高");
+    assert.greaterThan(strongInCastle.currentHp, weakInPlains.currentHp, "castle 怪物 HP 应远高于 plains 低级怪物");
     State.reset();
   });
 });
