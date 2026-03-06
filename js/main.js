@@ -51,8 +51,8 @@ const Game = (() => {
       Combat.spawnAndFight();
     }
 
-    // 战斗 tick
-    if (state.currentMonster && state.hero.hp > 0) {
+    // 战斗 tick（也处理非战斗状态下的 HP/MP 回复 & Rest）
+    if (state.hero.hp > 0) {
       Combat.tick(delta);
     }
 
