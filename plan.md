@@ -207,6 +207,7 @@ incremental/
 - [x] 战斗中 HP/MP 自然回复（v0.9.4）：`tickRegen` 现在在战斗分支也被调用（`resting=false`），英雄在战斗中以正常速率持续回复 HP/MP；新增 4 项战斗回复测试（353 通过）
 - [x] REST/Regen 双 Bug 修复（v0.9.3）：① `main.js` 非战斗状态不调用 `Combat.tick` 导致 REST 和自然回复完全无效；② `tickRegen` 用 `Math.max(1, Math.round(hpr))` 导致 HPR=0.2 时固定每秒回 1（5×偏快）；③ `tickRegen` 末尾调用不存在的 `UI.markDirty` 导致 UI 不刷新。修复：去掉 `main.js` 的 `currentMonster` 守卫；换用小数累计器（`hpRegenAcc`/`mpRegenAcc`）按 delta/1000 逐 tick 积分；改 `UI.markSidePanelDirty()`；新增 `tests/test-regen.js`（28 项测试，覆盖 HPR/MPR 基础值、小数累计精度、MP 回复、REST 3× 加速、战斗中断），总计 349 通过
 - [x] Hover Tooltip 全面扩展 + 频闪修复（v0.10.0）：① 技能行 hover 显示 tooltip（技能名/类型[主动/被动]/解锁等级/费用/前置条件/效果说明）；② Zone 行 hover 显示 tooltip（区域描述/普通怪物列表[名称+元素+HP/ATK/DEF/EXP]/Boss 信息+状态）；③ 修复装备 tooltip 绑定范围（移到 `label` span，不含操作按钮区域，解决卖掉后 tooltip 残留问题）；④ 修复侧面板重建频闪：`refreshSidePanelIfDirty` 在 tooltip visible 时跳过重建（推迟到鼠标离开后），彻底消除按钮 hover 每秒一次的闪烁；⑤ `tickRegen` 改为仅在 HP/MP 实际整数变化时才标脏，大幅减少不必要的 DOM 重建；⑥ `Skills.getTemplate(id)` 新增暴露，供 ui.js tooltip 查询前置技能名称；测试总计 353 通过（无新增，逻辑变更无测试点）
+- [x] 技能栏精简 + 火焰法师体验强化（v0.10.1）：① 技能栏移除名称行内描述文字（已学/未学均只保留名称+等级+费用），描述仅在 tooltip 内展示；② Pyro 状态栏新增 BURN 层数阶段提示：≥3 层显示橙色 `(≥3 → Inferno!)`，满层显示黄色加粗 `*** INFERNO NOW! ***`；③ Heat Shield 激活时在状态栏实时显示剩余时间和说明；④ Cauterize 激活（burn≥5）时状态栏显示绿色提示 `✦ CAUTERIZE active`；⑤ Ice Barrier（Cryo）激活时显示剩余护盾 HP；⑥ Lightning Rod（Storm）激活时将倒计时和触发次数纳入 buff 行；⑦ `combat.js` 新增 `heatShieldActive/Timer`、`iceBarrierHp`、`lightningRodActive/Timer/Hits` getter 供 UI 读取；⑧ 数值调整：Ignite CD 4s→3s，Inferno 爆炸阈值 5→3，Heat Shield CD 18s→12s；新增 `tests/test-pyro-ui.js`（35 项测试），总计 418 通过
 
 ---
 

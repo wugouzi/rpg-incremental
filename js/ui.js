@@ -234,16 +234,35 @@ const UI = (() => {
     // ── 法师专精状态 ──────────────────────────────
     if (state.mage && state.hero.class === "mage") {
       const m = state.mage;
+      const skillEffects = Skills.getEffects();
       if (m.spec === "storm") {
-        const cap = 5 + (Skills.getEffects().chargeCapBonus || 0);
+        const cap = 5 + (skillEffects.chargeCapBonus || 0);
         const filled = m.charge;
         const chargeBar = "[" + "█".repeat(filled) + "░".repeat(cap - filled) + "]";
         lines.push(`  ⚡ CHG : ${chargeBar} ${filled}/${cap}${filled >= cap ? " FULL!" : ""}`);
       } else if (m.spec === "pyro") {
-        const burnCap = 5 + (Skills.getEffects().burnCapBonus || 0);
+        const burnCap = 5 + (skillEffects.burnCapBonus || 0);
         const filled = m.burnStack;
         const burnBar = "[" + "█".repeat(filled) + "░".repeat(burnCap - filled) + "]";
-        lines.push(`  🔥 BURN: ${burnBar} ${filled}/${burnCap}`);
+        // 接近上限时给出爆炸提示（Inferno 阈值 = 3，或满层）
+        const infernoThresh = 3;
+        const explosionHint = filled >= burnCap
+          ? " *** INFERNO NOW! ***"
+          : filled >= infernoThresh
+            ? ` (≥${infernoThresh} → Inferno!)`
+            : "";
+        lines.push(`  🔥 BURN: ${burnBar} ${filled}/${burnCap}${explosionHint}`);
+
+        // Heat Shield 状态
+        if (window.Combat && Combat.heatShieldActive) {
+          const secLeft = (Combat.heatShieldTimer / 1000).toFixed(1);
+          lines.push(`  🛡️ HEAT SHIELD: ${secLeft}s  (reflect+burn on hit!)`);
+        }
+
+        // Cauterize：burn ≥ 5 时激活
+        if (skillEffects.cauterize && filled >= 5) {
+          lines.push(`  ✦ CAUTERIZE active  (+HP regen per stack)`);
+        }
       } else if (m.spec === "cryo") {
         if (m.frozen) {
           const secLeft = (m.freezeTimer / 1000).toFixed(1);
@@ -252,6 +271,10 @@ const UI = (() => {
           const filled = m.chillStack;
           const chillBar = "[" + "▪".repeat(filled) + "░".repeat(5 - filled) + "]";
           lines.push(`  ❄️  CHILL: ${chillBar} ${filled}/5${filled >= 5 ? " → FREEZE!" : ""}`);
+        }
+        // Ice Barrier 状态
+        if (window.Combat && Combat.iceBarrierHp > 0) {
+          lines.push(`  🧊 ICE BARRIER: ${Combat.iceBarrierHp} HP`);
         }
       }
 
@@ -263,12 +286,18 @@ const UI = (() => {
       if (m.timeWarpActive)        buffParts.push(`WARP(${(m.timeWarpTimer/1000).toFixed(1)}s)`);
       if (m.spellEchoCount > 0)    buffParts.push(`ECHO:${m.spellEchoCount}/3`);
       if (m.leyLineReady)          buffParts.push("LEY:READY");
+      // Lightning Rod（Storm）
+      if (window.Combat && Combat.lightningRodActive) {
+        const rodSec = (Combat.lightningRodTimer / 1000).toFixed(1);
+        const rodHits = Combat.lightningRodHits;
+        buffParts.push(`⚡ROD(${rodSec}s,${rodHits}/3)`);
+      }
       if (buffParts.length > 0) {
         lines.push(`  ✦ ${buffParts.join(" | ")}`);
       }
     }
 
-    // 使用逐行着色渲染（heatShield/lightningRod 等在 combat 内部管理，不在 state 上）
+    // 使用逐行着色渲染
     const el = document.getElementById("combat-status");
     el.innerHTML = "";
     const pre = document.createElement("pre");
@@ -279,12 +308,26 @@ const UI = (() => {
       const span = document.createElement("span");
       span.textContent = line + (i < lines.length - 1 ? "\n" : "");
 
-      if (line.includes("⚡") || line.includes("CHG")) {
+      if (line.includes("⚡") || line.includes("CHG") || line.includes("ROD")) {
         span.style.color = line.includes("FULL") ? COLOR_MAP.yellow : COLOR_MAP.cyan;
       } else if (line.includes("🔥") || line.includes("BURN")) {
-        span.style.color = COLOR_MAP.red;
+        // 接近满层时显示黄色警告，满层时红色加粗
+        if (line.includes("INFERNO NOW")) {
+          span.style.color = COLOR_MAP.yellow;
+          span.style.fontWeight = "bold";
+        } else if (line.includes("Inferno!")) {
+          span.style.color = "#ffaa44"; // 橙色：已达阈值可引爆
+        } else {
+          span.style.color = COLOR_MAP.red;
+        }
+      } else if (line.includes("🛡️") || line.includes("HEAT SHIELD")) {
+        span.style.color = "#ff8844"; // 橙红：Heat Shield
+      } else if (line.includes("CAUTERIZE")) {
+        span.style.color = COLOR_MAP.green; // 绿色：正在回血
       } else if (line.includes("❄️") || line.includes("CHILL") || line.includes("FROZEN")) {
         span.style.color = line.includes("FROZEN") ? COLOR_MAP.yellow : COLOR_MAP.cyan;
+      } else if (line.includes("🧊") || line.includes("ICE BARRIER")) {
+        span.style.color = COLOR_MAP.cyan;
       } else if (line.includes("✦")) {
         span.style.color = COLOR_MAP.yellow;
       } else {
@@ -1092,10 +1135,6 @@ const UI = (() => {
         // tooltip 绑定在已学习的技能名上
         _bindSkillTooltip(learnedSpan, skill, true);
         row.appendChild(learnedSpan);
-        const descSpan2 = document.createElement("span");
-        descSpan2.style.color = COLOR_MAP.gray;
-        descSpan2.textContent = ` ${skill.description}`;
-        row.appendChild(descSpan2);
       } else {
         const canLearn = check.ok;
         const nameColor = canLearn ? COLOR_MAP.white : COLOR_MAP.gray;
@@ -1106,11 +1145,6 @@ const UI = (() => {
         // tooltip 绑定在技能名 span 上（不含 Learn 按钮）
         _bindSkillTooltip(nameSpan, skill, false);
         row.appendChild(nameSpan);
-
-        const descSpan = document.createElement("span");
-        descSpan.textContent = ` - ${skill.description}`;
-        descSpan.style.color = COLOR_MAP.gray;
-        row.appendChild(descSpan);
 
         row.appendChild(document.createElement("br"));
 

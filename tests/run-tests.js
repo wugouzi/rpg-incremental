@@ -101,6 +101,7 @@ const testFiles = [
   "test-skill-subgroups.js",
   "test-regen.js",
   "test-ui-dirty.js",
+  "test-pyro-ui.js",
 ];
 
 console.log(gr("Running tests...\n"));

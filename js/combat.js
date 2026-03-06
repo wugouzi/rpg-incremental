@@ -1281,6 +1281,15 @@ UI.addLog(`>> [DROP] ${item.name} [${Equipment.getRarityLabel(item.rarity)}]`, c
     get heroTimer() { return heroTimer; },
     set heroTimer(v) { heroTimer = v; },
     get isResting() { return isResting; },
+    // Pyro UI 状态暴露
+    get heatShieldActive() { return heatShieldActive; },
+    get heatShieldTimer()  { return heatShieldTimer;  },
+    // Cryo UI 状态暴露
+    get iceBarrierHp() { return iceBarrierHp; },
+    // Storm UI 状态暴露
+    get lightningRodActive() { return lightningRodActive; },
+    get lightningRodTimer()  { return lightningRodTimer;  },
+    get lightningRodHits()   { return lightningRodHits;   },
   };
 })();
 
